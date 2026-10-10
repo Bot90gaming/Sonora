@@ -9,8 +9,8 @@ from ui.main_window import MainWindow
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("YTMusic Player")
-    app.setOrganizationName("YTMusicPlayer")
+    app.setApplicationName("Sonora")
+    app.setOrganizationName("Sonora")
     app.setWindowIcon(QIcon("app.png"))
 
     # Base font

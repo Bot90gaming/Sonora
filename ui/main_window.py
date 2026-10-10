@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
         top_bar.setStyleSheet("background:#0d0d1f; border-bottom:1px solid #1a1a3a;")
         top_layout = QHBoxLayout(top_bar)
         top_layout.setContentsMargins(16, 0, 16, 0)
-        app_title = QLabel("🎵 YTMusic Player")
+        app_title = QLabel("Sonora")
         app_title.setStyleSheet("color:#7c6af7; font-weight:700; font-size:14px;")
         top_layout.addWidget(app_title)
         top_layout.addStretch()

@@ -1,5 +1,6 @@
 """
 Audio player backed by PyQt6.QtMultimedia.QMediaPlayer.
+
 """
 from __future__ import annotations
 from PyQt6.QtCore import QObject, pyqtSignal, QUrl, pyqtSlot

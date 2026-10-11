@@ -21,7 +21,7 @@ def main():
     print("  YTMusic Player — Setup")
     print("=" * 50)
 
-    # 1. Install Python deps
+    # 1. Cài đặt các gói phụ thuộc của Python
     print("\n[1/3] Installing Python dependencies…")
     ok = run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
     if not ok:
@@ -29,7 +29,7 @@ def main():
 
     os_name = platform.system()
 
-    # 2. Check PyQt6 multimedia
+    # 2. Kiểm tra mô-đun đa phương tiện của PyQt6
     print("\n[2/3] Checking PyQt6 multimedia…")
     try:
         from PyQt6.QtMultimedia import QMediaPlayer
@@ -38,7 +38,7 @@ def main():
         print("      ✗ PyQt6.QtMultimedia not found.")
         print("        Try: pip install PyQt6 PyQt6-Qt6")
 
-    # 3. Check ffmpeg (needed for downloads)
+    # 3. Kiểm tra ffmpeg (cần thiết để tải xuống)
     print("\n[3/3] Checking ffmpeg (needed for downloads)…")
     result = subprocess.run(["ffmpeg", "-version"], capture_output=True)
     if result.returncode == 0:

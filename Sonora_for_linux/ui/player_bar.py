@@ -29,14 +29,14 @@ class PlayerBar(Gtk.Box):
         self.add_css_class("toolbar")
         self.set_margin_top(0)
 
-        # Wire player callbacks
+        # Kết nối các hàm xử lý sự kiện của trình phát.
         self.player.on_position     = self._on_position
         self.player.on_state_change = self._on_state
         self.player.on_error        = self._on_error
 
         self._build()
 
-    # ── Construction ──────────────────────────────────────────────────────────
+    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
 
     def _build(self):
         self.set_spacing(16)
@@ -45,7 +45,7 @@ class PlayerBar(Gtk.Box):
         self.set_margin_top(8)
         self.set_margin_bottom(8)
 
-        # ── Left: art + info ─────────────────────────────────────────────────
+        # ── Bên trái: ảnh bìa và thông tin ───────────────────────────────────
         left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         left.set_size_request(260, -1)
 
@@ -75,12 +75,12 @@ class PlayerBar(Gtk.Box):
         left.append(info)
         self.append(left)
 
-        # ── Centre: controls + seek ───────────────────────────────────────────
+        # ── Ở giữa: điều khiển và tua bài ────────────────────────────────────
         centre = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         centre.set_hexpand(True)
         centre.set_valign(Gtk.Align.CENTER)
 
-        # Transport buttons
+        # Các nút điều khiển phát
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btns.set_halign(Gtk.Align.CENTER)
 
@@ -100,7 +100,7 @@ class PlayerBar(Gtk.Box):
         btns.append(self._btn_next)
         centre.append(btns)
 
-        # Seek row
+        # Hàng điều khiển tua bài
         seek_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         seek_row.set_halign(Gtk.Align.CENTER)
 
@@ -114,7 +114,7 @@ class PlayerBar(Gtk.Box):
         self._seek.set_size_request(320, -1)
         self._seek.set_draw_value(False)
         self._seek.set_hexpand(False)
-        # GTK4: use GestureDrag instead of button-press/release events
+        # GTK4: dùng GestureDrag thay cho sự kiện nhấn/thả chuột.
         drag = Gtk.GestureDrag()
         drag.connect("drag-begin",  lambda *_: setattr(self, "_dragging", True))
         drag.connect("drag-end",    self._on_seek_drag_end)
@@ -131,7 +131,7 @@ class PlayerBar(Gtk.Box):
         centre.append(seek_row)
         self.append(centre)
 
-        # ── Right: volume ─────────────────────────────────────────────────────
+        # ── Bên phải: âm lượng ───────────────────────────────────────────────
         right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         right.set_size_request(200, -1)
         right.set_halign(Gtk.Align.END)
@@ -149,7 +149,7 @@ class PlayerBar(Gtk.Box):
         right.append(self._vol)
         self.append(right)
 
-    # ── Public ────────────────────────────────────────────────────────────────
+    # ── Phần công khai ───────────────────────────────────────────────────────
 
     def load_song(self, song: dict):
         self._lbl_title.set_label(song.get("title", "Unknown"))
@@ -159,7 +159,7 @@ class PlayerBar(Gtk.Box):
         if url:
             load_thumbnail_async(url, self._set_thumb)
 
-    # ── Callbacks ─────────────────────────────────────────────────────────────
+    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
 
     def _toggle_play(self, *_):
         if self.player.is_playing():
@@ -196,7 +196,7 @@ class PlayerBar(Gtk.Box):
             self._thumb.set_from_pixbuf(pix)
 
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# ── Hàm hỗ trợ ───────────────────────────────────────────────────────────────
 
 def _icon_btn(icon: str, tooltip: str) -> Gtk.Button:
     btn = Gtk.Button()

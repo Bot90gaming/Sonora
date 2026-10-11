@@ -51,7 +51,7 @@ class ThumbnailLoader(QObject):
                 Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                 Qt.TransformationMode.SmoothTransformation
             )
-            # Centre-crop to 64×64
+            # Cắt chính giữa ảnh thành kích thước 64×64.
             x = (scaled.width()  - 64) // 2
             y = (scaled.height() - 64) // 2
             cropped = scaled.copy(x, y, 64, 64)
@@ -74,7 +74,7 @@ class PlayerBar(QWidget):
         self._build_ui()
         self._connect_signals()
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
 
     def _build_ui(self):
         self.setFixedHeight(96)
@@ -89,7 +89,7 @@ class PlayerBar(QWidget):
         root.setContentsMargins(T.SP_4, T.SP_3, T.SP_4, T.SP_3)
         root.setSpacing(T.SP_4)
 
-        # ── Left: album art + info ───────────────────────────────────────────
+        # ── Bên trái: ảnh bìa và thông tin ───────────────────────────────────
         self.thumb = QLabel()
         self.thumb.setFixedSize(64, 64)
         self.thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -130,12 +130,12 @@ class PlayerBar(QWidget):
 
         root.addStretch()
 
-        # ── Centre: transport + seek ─────────────────────────────────────────
+        # ── Ở giữa: điều khiển phát và tua bài ───────────────────────────────
         centre_col = QVBoxLayout()
         centre_col.setSpacing(T.SP_2)
         centre_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Transport row
+        # Hàng nút điều khiển phát
         btn_row = QHBoxLayout()
         btn_row.setSpacing(T.SP_2)
         btn_row.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -155,7 +155,7 @@ class PlayerBar(QWidget):
         btn_row.addWidget(self.btn_play)
         btn_row.addWidget(self.btn_next)
 
-        # Seek row
+        # Hàng điều khiển tua bài
         seek_row = QHBoxLayout()
         seek_row.setSpacing(T.SP_2)
         seek_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -187,7 +187,7 @@ class PlayerBar(QWidget):
 
         root.addStretch()
 
-        # ── Right: volume ────────────────────────────────────────────────────
+        # ── Bên phải: âm lượng ───────────────────────────────────────────────
         vol_col = QVBoxLayout()
         vol_col.setSpacing(T.SP_1)
         vol_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -221,7 +221,7 @@ class PlayerBar(QWidget):
         self.player.duration_changed.connect(self._on_duration)
         self.player.state_changed.connect(self._on_state)
 
-    # ── Public ────────────────────────────────────────────────────────────────
+    # ── Phần công khai ───────────────────────────────────────────────────────
 
     def load_song(self, song: dict):
         self._current_song = song
@@ -235,7 +235,7 @@ class PlayerBar(QWidget):
         if url:
             self._load_thumbnail(url)
 
-    # ── Slots ─────────────────────────────────────────────────────────────────
+    # ── Hàm xử lý tín hiệu ───────────────────────────────────────────────────
 
     def _toggle_play(self):
         if self.player.is_playing():

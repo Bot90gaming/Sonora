@@ -8,21 +8,21 @@ gi.require_version('Adw', '1')
 gi.require_version('Gst', '1.0')
 from gi.repository import Gtk, Adw, Gst, GLib
 
-# Initialise GStreamer before anything else
+# Khởi tạo GStreamer trước mọi thành phần khác.
 Gst.init(None)
 
 
 def main():
     app = Adw.Application(application_id="io.github.ytmusic_player")
 
-    # Force dark colour scheme to match our purple aesthetic
+    # Buộc dùng giao diện tối để phù hợp với tông màu tím.
     app.connect("activate", _on_activate)
 
     sys.exit(app.run(sys.argv))
 
 
 def _on_activate(app: Adw.Application):
-    # Follow system preference; call set_color_scheme to force dark if desired
+    # Dùng thiết lập của hệ thống; gọi set_color_scheme để buộc dùng giao diện tối nếu cần.
     Adw.StyleManager.get_default().set_color_scheme(
         Adw.ColorScheme.PREFER_DARK
     )

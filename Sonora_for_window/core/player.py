@@ -8,7 +8,7 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 
 class Player(QObject):
-    # Declare position/duration as 'qint64' to match QMediaPlayer's signal type exactly
+    # Khai báo position/duration là 'qint64' để khớp chính xác kiểu tín hiệu của QMediaPlayer.
     position_changed = pyqtSignal('qint64')
     duration_changed = pyqtSignal('qint64')
     state_changed    = pyqtSignal(str)
@@ -27,7 +27,7 @@ class Player(QObject):
         self._media.playbackStateChanged.connect(self._on_state)
         self._media.errorOccurred.connect(self._on_error)
 
-    # ── Controls ──────────────────────────────────────────────────────────────
+    # ── Điều khiển ───────────────────────────────────────────────────────────
 
     def play_url(self, url: str):
         self._media.setSource(QUrl(url))
@@ -50,7 +50,7 @@ class Player(QObject):
         if dur > 0:
             self._media.setPosition(int(pct * dur))
 
-    # ── Volume ────────────────────────────────────────────────────────────────
+    # ── Âm lượng ─────────────────────────────────────────────────────────────
 
     def set_volume(self, vol: int):
         clamped = max(0, min(vol, 100))
@@ -63,7 +63,7 @@ class Player(QObject):
     def toggle_mute(self):
         self._audio.setMuted(not self._audio.isMuted())
 
-    # ── State ─────────────────────────────────────────────────────────────────
+    # ── Trạng thái ───────────────────────────────────────────────────────────
 
     def is_playing(self) -> bool:
         return self._media.playbackState() == QMediaPlayer.PlaybackState.PlayingState
@@ -74,7 +74,7 @@ class Player(QObject):
     def get_duration(self) -> int:
         return self._media.duration()
 
-    # ── Internal ──────────────────────────────────────────────────────────────
+    # ── Phần nội bộ ──────────────────────────────────────────────────────────
 
     @pyqtSlot(QMediaPlayer.PlaybackState)
     def _on_state(self, state):

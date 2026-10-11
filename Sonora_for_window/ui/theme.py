@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-# Color tokens
+# Mã màu
 BG = "#0f0e17"
 SURFACE = "#171622"
 SURFACE_VAR = "#22212e"
@@ -16,19 +16,19 @@ OUTLINE_VARIANT = "#494554"
 HOVER_OVERLAY = "#2a2735"
 ERROR = "#ffb4ab"
 
-# Spacing
+# Khoảng cách
 SP_1 = 4
 SP_2 = 8
 SP_3 = 12
 SP_4 = 16
 SP_5 = 24
 
-# Corner radii
+# Bán kính bo góc
 RADIUS_SM = 8
 RADIUS_MD = 12
 RADIUS_LG = 16
 
-# Typography sizes
+# Cỡ chữ
 TS_CAPTION = 11
 TS_LABEL = 12
 TS_BODY = 14

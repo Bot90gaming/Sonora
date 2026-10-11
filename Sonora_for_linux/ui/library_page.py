@@ -31,10 +31,10 @@ class LibraryPage(Gtk.Paned):
         self._track_panel: Gtk.Widget | None = None
         self._build()
 
-    # ── Construction ──────────────────────────────────────────────────────────
+    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
 
     def _build(self):
-        # ── Left sidebar ──────────────────────────────────────────────────────
+        # ── Thanh bên trái ───────────────────────────────────────────────────
         sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         sidebar_box.set_size_request(220, -1)
 
@@ -61,7 +61,7 @@ class LibraryPage(Gtk.Paned):
         self.set_resize_start_child(False)
         self.set_shrink_start_child(False)
 
-        # ── Right panel ───────────────────────────────────────────────────────
+        # ── Bảng bên phải ────────────────────────────────────────────────────
         self._right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._right.set_hexpand(True)
 
@@ -75,11 +75,11 @@ class LibraryPage(Gtk.Paned):
         self.set_end_child(self._right)
         self.set_resize_end_child(True)
 
-        # Populate sidebar
+        # Điền dữ liệu vào thanh bên
         self._populate_sidebar()
 
     def _populate_sidebar(self):
-        # Static items
+        # Các mục cố định
         for label, key in [
             ("♥  Liked Songs", "liked"),
             ("── Playlists ──", None),
@@ -98,7 +98,7 @@ class LibraryPage(Gtk.Paned):
             row.set_child(lbl)
             self._sidebar_lb.append(row)
 
-        # Load playlists + albums async
+        # Tải danh sách phát và album bất đồng bộ
         threading.Thread(target=self._fetch_sidebar, daemon=True).start()
 
     def _fetch_sidebar(self):
@@ -127,7 +127,7 @@ class LibraryPage(Gtk.Paned):
             row.set_child(lbl)
             self._sidebar_lb.append(row)
 
-        # Albums separator
+        # Đường phân cách album
         sep_row = Gtk.ListBoxRow()
         sep_row._key = None
         sep_row.set_selectable(False)
@@ -153,7 +153,7 @@ class LibraryPage(Gtk.Paned):
             row.set_child(lbl)
             self._sidebar_lb.append(row)
 
-    # ── Callbacks ─────────────────────────────────────────────────────────────
+    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
 
     def _on_sidebar_select(self, lb, row):
         if row is None or not hasattr(row, "_key"):
@@ -176,12 +176,12 @@ class LibraryPage(Gtk.Paned):
                     songs = self.api.get_liked_songs(limit=200)
                 elif kind == "playlist":
                     songs = self.api.get_playlist_tracks(browse_id)
-                else:  # album
+                else:  # Trường hợp album.
                     songs = self.api.get_album_tracks(browse_id)
                 GLib.idle_add(self._show_tracks, songs)
             except Exception as exc:
                 msg = str(exc)
-                # ytmusicapi returns this when not signed in
+                # ytmusicapi trả về giá trị này khi chưa đăng nhập.
                 if "Sign in" in msg or "twoColumn" in msg or "singleColumn" in msg:
                     GLib.idle_add(self._show_not_signed_in)
                 else:

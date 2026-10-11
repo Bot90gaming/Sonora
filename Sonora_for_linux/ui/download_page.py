@@ -31,13 +31,13 @@ class DownloadPage(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._downloader = Downloader()
         self._out_dir = _DEFAULT_DIR
-        self._fmt_idx = 0   # mp3 default
+        self._fmt_idx = 0   # Mặc định là mp3.
         self._build()
 
-    # ── Construction ──────────────────────────────────────────────────────────
+    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
 
     def _build(self):
-        # Settings bar
+        # Thanh cài đặt
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bar.set_margin_top(12)
         bar.set_margin_bottom(12)
@@ -69,10 +69,10 @@ class DownloadPage(Gtk.Box):
         bar.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         bar.append(fmt_lbl)
         bar.append(self._fmt_drop)
-        bar.append(Gtk.Box())  # spacer
+        bar.append(Gtk.Box())  # Vùng đệm.
         bar.append(open_btn)
 
-        # Make spacer expand
+        # Mở rộng vùng đệm
         bar.get_first_child()  # dir_lbl — walk to spacer
         spacer = open_btn.get_prev_sibling()
         spacer.set_hexpand(True)
@@ -80,7 +80,7 @@ class DownloadPage(Gtk.Box):
         self.append(bar)
         self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        # Empty state
+        # Trạng thái trống
         self._empty = Adw.StatusPage()
         self._empty.set_icon_name("folder-download-symbolic")
         self._empty.set_title("No downloads yet")
@@ -89,7 +89,7 @@ class DownloadPage(Gtk.Box):
         self._empty.set_vexpand(True)
         self.append(self._empty)
 
-        # Card list (hidden until first download)
+        # Danh sách thẻ (ẩn cho đến lần tải xuống đầu tiên)
         self._card_sw = Gtk.ScrolledWindow()
         self._card_sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self._card_sw.set_vexpand(True)
@@ -102,7 +102,7 @@ class DownloadPage(Gtk.Box):
 
         self._card_sw.set_child(self._card_box)
 
-    # ── Public API ────────────────────────────────────────────────────────────
+    # ── API công khai ────────────────────────────────────────────────────────
 
     def download_song(self, song: dict):
         title  = song.get("title",  "Unknown")
@@ -114,7 +114,7 @@ class DownloadPage(Gtk.Box):
         fmt = _FORMATS[self._fmt_drop.get_selected()]
         card = _DownloadCard(title, artist)
 
-        # Show card list on first download
+        # Hiện danh sách thẻ khi bắt đầu tải xuống lần đầu
         if self._empty.get_parent() is self:
             self.remove(self._empty)
             self.append(self._card_sw)
@@ -132,7 +132,7 @@ class DownloadPage(Gtk.Box):
             on_error    = card.set_error,
         )
 
-    # ── Callbacks ─────────────────────────────────────────────────────────────
+    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
 
     def _pick_dir(self, *_):
         dialog = Gtk.FileDialog()
@@ -152,7 +152,7 @@ class DownloadPage(Gtk.Box):
         self._fmt_idx = drop.get_selected()
 
 
-# ── Download card ─────────────────────────────────────────────────────────────
+# ── Thẻ tải xuống ───────────────────────────────────────────────────────────
 
 class _DownloadCard(Gtk.Box):
     def __init__(self, title: str, artist: str):

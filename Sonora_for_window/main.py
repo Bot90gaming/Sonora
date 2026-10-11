@@ -13,7 +13,7 @@ def main():
     app.setOrganizationName("Sonora")
     app.setWindowIcon(QIcon("images/app.png"))
 
-    # Base font
+    # Phông chữ cơ bản
     font = QFont("Segoe UI", 10)
     font.setHintingPreference(QFont.HintingPreference.PreferDefaultHinting)
     app.setFont(font)

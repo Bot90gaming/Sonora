@@ -53,21 +53,21 @@ def track_row(song: dict) -> Gtk.Box:
     box.set_margin_bottom(6)
     box.set_margin_start(12)
     box.set_margin_end(12)
-    box.song = song   # stash for retrieval on activation
+    box.song = song   # Lưu bài hát để truy xuất khi kích hoạt.
 
-    # Thumbnail placeholder
+    # Ảnh bìa giữ chỗ
     thumb = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
     thumb.set_pixel_size(40)
     thumb.add_css_class("track-thumb")
     box.append(thumb)
 
-    # Title + artist
+    # Tên bài hát và nghệ sĩ
     info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
     info.set_hexpand(True)
 
     lbl_title = Gtk.Label(label=song.get("title", ""))
     lbl_title.set_halign(Gtk.Align.START)
-    lbl_title.set_ellipsize(3)   # PANGO_ELLIPSIZE_END
+    lbl_title.set_ellipsize(3)   # Cắt bớt văn bản ở cuối theo quy tắc của Pango.
     lbl_title.add_css_class("title-4")
 
     lbl_artist = Gtk.Label(label=song.get("artist", ""))
@@ -80,7 +80,7 @@ def track_row(song: dict) -> Gtk.Box:
     info.append(lbl_artist)
     box.append(info)
 
-    # Duration
+    # Thời lượng
     lbl_dur = Gtk.Label(label=fmt_dur(song.get("duration")))
     lbl_dur.add_css_class("caption")
     lbl_dur.add_css_class("dim-label")
@@ -88,7 +88,7 @@ def track_row(song: dict) -> Gtk.Box:
     lbl_dur.set_xalign(1.0)
     box.append(lbl_dur)
 
-    # Load thumbnail if available
+    # Tải ảnh bìa nếu có
     url = song.get("thumbnail", "")
     if url:
         def _set_thumb(pix):
@@ -125,7 +125,7 @@ def make_track_list(songs: list[dict],
 
     if on_menu:
         gesture = Gtk.GestureClick()
-        gesture.set_button(3)   # right-click
+        gesture.set_button(3)   # Nhấn chuột phải.
 
         def _right_click(g, n, x, y):
             row = lb.get_row_at_y(int(y))

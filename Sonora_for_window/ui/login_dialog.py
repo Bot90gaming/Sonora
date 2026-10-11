@@ -81,7 +81,7 @@ class LoginDialog(QDialog):
         layout.setSpacing(T.SP_4)
         layout.setContentsMargins(T.SP_5, T.SP_5, T.SP_5, T.SP_5)
 
-        # ── Header ────────────────────────────────────────────────────────────
+        # ── Phần đầu ─────────────────────────────────────────────────────────
         header = QHBoxLayout()
         icon = QLabel("🎵")
         icon.setStyleSheet(f"font-size: {T.TS_DISPLAY}px;")
@@ -102,13 +102,13 @@ class LoginDialog(QDialog):
         header.addLayout(title_col, stretch=1)
         layout.addLayout(header)
 
-        # Divider
+        # Đường phân cách
         div = QFrame()
         div.setFixedHeight(1)
         div.setStyleSheet(f"background: {T.OUTLINE_VARIANT};")
         layout.addWidget(div)
 
-        # ── Steps card ────────────────────────────────────────────────────────
+        # ── Thẻ hướng dẫn từng bước ──────────────────────────────────────────
         steps_card = QFrame()
         steps_card.setStyleSheet(f"""
             QFrame {{
@@ -142,7 +142,7 @@ class LoginDialog(QDialog):
 
         layout.addWidget(steps_card)
 
-        # ── Headers input ─────────────────────────────────────────────────────
+        # ── Vùng nhập header ─────────────────────────────────────────────────
         lbl_input = QLabel("Request headers:")
         lbl_input.setStyleSheet(f"color: {T.ON_SURFACE_VARIANT}; font-size: {T.TS_LABEL}px;")
         layout.addWidget(lbl_input)
@@ -172,12 +172,12 @@ class LoginDialog(QDialog):
         """)
         layout.addWidget(self.headers_edit)
 
-        # ── Status ────────────────────────────────────────────────────────────
+        # ── Trạng thái ───────────────────────────────────────────────────────
         self.status_lbl = QLabel("")
         self.status_lbl.setStyleSheet(f"color: {T.ON_SURFACE_VARIANT}; font-size: {T.TS_LABEL}px;")
         layout.addWidget(self.status_lbl)
 
-        # ── Buttons ───────────────────────────────────────────────────────────
+        # ── Các nút ──────────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
@@ -195,7 +195,7 @@ class LoginDialog(QDialog):
 
         layout.addLayout(btn_row)
 
-    # ── Logic ─────────────────────────────────────────────────────────────────
+    # ── Xử lý ────────────────────────────────────────────────────────────────
 
     def _do_sign_in(self):
         raw = self.headers_edit.toPlainText().strip()

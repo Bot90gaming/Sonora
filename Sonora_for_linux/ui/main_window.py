@@ -47,17 +47,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._build()
         self._init_api()
 
-    # ── Construction ──────────────────────────────────────────────────────────
+    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
 
     def _build(self):
-        # Root toolbar-view holds header + content
+        # Thanh công cụ gốc chứa phần đầu và vùng nội dung.
         toolbar_view = Adw.ToolbarView()
 
-        # Header bar
+        # Thanh tiêu đề
         header = Adw.HeaderBar()
         header.set_centering_policy(Adw.CenteringPolicy.STRICT)
 
-        # Account menu button (right side)
+        # Nút menu tài khoản (bên phải)
         self._acct_btn = Gtk.MenuButton()
         self._acct_btn.set_icon_name("avatar-default-symbolic")
         self._acct_btn.set_tooltip_text("Account")
@@ -67,14 +67,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         toolbar_view.add_top_bar(header)
 
-        # ViewStack
+        # Ngăn xếp chế độ xem
         self._stack = Adw.ViewStack()
         self._stack.set_vexpand(True)
 
-        # ── Pages ─────────────────────────────────────────────────────────────
+        # ── Các trang ────────────────────────────────────────────────────────
         self._dl_page = DownloadPage()
 
-        # search + library get real api later via _init_api
+        # Trang tìm kiếm và thư viện sẽ nhận API thật sau thông qua _init_api.
         self._search_page = SearchPage(
             api=_stub_api(),
             on_play=self._play_song,
@@ -96,18 +96,18 @@ class MainWindow(Adw.ApplicationWindow):
             self._dl_page, "downloads", "Downloads",
             "folder-download-symbolic")
 
-        # ViewSwitcher in the header
+        # Bộ chuyển trang trên thanh tiêu đề
         switcher = Adw.ViewSwitcher()
         switcher.set_stack(self._stack)
         switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
         header.set_title_widget(switcher)
 
-        # Player bar (bottom)
+        # Thanh trình phát (phía dưới)
         self._player_bar = PlayerBar(self._player)
         self._player_bar.on_next = self._next_track
         self._player_bar.on_prev = self._prev_track
 
-        # Assemble
+        # Ghép các thành phần giao diện
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         content_box.append(self._stack)
         content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
@@ -146,7 +146,7 @@ class MainWindow(Adw.ApplicationWindow):
         popover.set_child(box)
         return popover
 
-    # ── API init ──────────────────────────────────────────────────────────────
+    # ── Khởi tạo API ─────────────────────────────────────────────────────────
 
     def _init_api(self):
         def _build():
@@ -169,7 +169,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._login_btn.set_visible(True)
             self._logout_btn.set_visible(False)
 
-    # ── Playback ──────────────────────────────────────────────────────────────
+    # ── Phát nhạc ────────────────────────────────────────────────────────────
 
     def _play_song(self, song: dict):
         """Play a single song immediately (replaces queue)."""
@@ -223,7 +223,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._q_idx -= 1
             self._start_playing(self._queue[self._q_idx])
 
-    # ── Auth ──────────────────────────────────────────────────────────────────
+    # ── Xác thực ─────────────────────────────────────────────────────────────
 
     def _show_login(self, *_):
         self._acct_menu.popdown()
@@ -240,13 +240,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._init_api()
         self._toast("Signed out")
 
-    # ── Download helper ───────────────────────────────────────────────────────
+    # ── Hỗ trợ tải xuống ─────────────────────────────────────────────────────
 
     def download_song(self, song: dict):
         self._stack.set_visible_child_name("downloads")
         self._dl_page.download_song(song)
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # ── Tiện ích ─────────────────────────────────────────────────────────────
 
     def _toast(self, msg: str):
         toast = Adw.Toast.new(msg)
@@ -254,7 +254,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._toast_overlay.add_toast(toast)
 
 
-# ── Stub API (before real client is ready) ────────────────────────────────────
+# ── API giả (trước khi API thật sẵn sàng) ────────────────────────────────────
 
 class _stub_api:
     def search(self, *a, **kw): return []

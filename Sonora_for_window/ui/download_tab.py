@@ -19,7 +19,7 @@ class DownloadTab(QWidget):
         self.downloader   = downloader
         self._out_dir     = DEFAULT_DOWNLOAD_DIR
         self._format      = "mp3"
-        self._active: dict[str, int] = {}   # video_id -> row
+        self._active: dict[str, int] = {}   # Ánh xạ video_id sang số hàng.
         self._build_ui()
         self._connect_signals()
 
@@ -28,7 +28,7 @@ class DownloadTab(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
-        # ── Settings row ──
+        # ── Hàng cài đặt ──
         settings = QHBoxLayout()
         lbl = QLabel("Save to:")
         lbl.setStyleSheet("color:#888aaa; font-size:12px;")
@@ -71,7 +71,7 @@ class DownloadTab(QWidget):
         settings.addStretch()
         layout.addLayout(settings)
 
-        # ── Downloads table ──
+        # ── Bảng tải xuống ──
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Title", "Artist", "Progress", "Status"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -103,7 +103,7 @@ class DownloadTab(QWidget):
         self.downloader.finished.connect(self._on_finished)
         self.downloader.error.connect(self._on_error)
 
-    # ── Public API ────────────────────────────────────────────────────────────
+    # ── API công khai ────────────────────────────────────────────────────────
 
     def start_download(self, song: dict):
         vid   = song.get("videoId", "")
@@ -112,7 +112,7 @@ class DownloadTab(QWidget):
         if not vid:
             return
         if vid in self._active:
-            return  # already in table
+            return  # Bài hát đã có trong bảng.
 
         row = self.table.rowCount()
         self.table.insertRow(row)
@@ -136,7 +136,7 @@ class DownloadTab(QWidget):
         self.downloader.download(vid, title, artist, self._out_dir, self._format)
         self.status_lbl.setText(f"Downloading: {title}")
 
-    # ── Slots ─────────────────────────────────────────────────────────────────
+    # ── Hàm xử lý tín hiệu ───────────────────────────────────────────────────
 
     def _on_progress(self, vid: str, pct: float):
         row = self._active.get(vid)

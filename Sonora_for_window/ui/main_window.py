@@ -25,7 +25,7 @@ from ui.thread_util import start_thread, retire_thread
 import ui.theme as T
 
 
-# ── Stream fetcher ────────────────────────────────────────────────────────────
+# ── Bộ tải luồng phát ────────────────────────────────────────────────────────
 
 class StreamFetcher(QObject):
     ready    = pyqtSignal(str, dict)
@@ -107,7 +107,7 @@ def _safe_remove(path: str):
         pass
 
 
-# ── Main window ───────────────────────────────────────────────────────────────
+# ── Cửa sổ chính ─────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -168,7 +168,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # ── Top bar ──────────────────────────────────────────────────────────
+        # ── Thanh trên cùng ──────────────────────────────────────────────────
         top_bar = QWidget()
         top_bar.setFixedHeight(56)
         top_bar.setStyleSheet(f"""
@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         top_layout.setContentsMargins(T.SP_4, 0, T.SP_4, 0)
         top_layout.setSpacing(T.SP_3)
 
-        # App logo + title
+        # Biểu trưng và tên ứng dụng
         logo = QLabel("♫")
         logo.setStyleSheet(f"""
             color: {T.PRIMARY};
@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
         top_layout.addWidget(self.btn_auth)
         layout.addWidget(top_bar)
 
-        # ── Tab widget ────────────────────────────────────────────────────────
+        # ── Thành phần thẻ ───────────────────────────────────────────────────
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
         self.tabs.setStyleSheet(f"""
@@ -254,11 +254,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.download_tab, "⬇  Downloads")
         layout.addWidget(self.tabs, stretch=1)
 
-        # ── Player bar ────────────────────────────────────────────────────────
+        # ── Thanh trình phát ─────────────────────────────────────────────────
         self.player_bar = PlayerBar(self.player)
         layout.addWidget(self.player_bar)
 
-        # ── Signal wiring ─────────────────────────────────────────────────────
+        # ── Kết nối tín hiệu ──────────────────────────────────────────────────
         self.search_tab.play_requested.connect(self._play_song)
         self.search_tab.add_to_queue.connect(self._enqueue)
         self.search_tab.download_requested.connect(self.download_tab.start_download)
@@ -274,7 +274,7 @@ class MainWindow(QMainWindow):
         self.player.error_occurred.connect(
             lambda msg: self.statusBar().showMessage(f"Player error: {msg}", 5000))
 
-    # ── Auth ──────────────────────────────────────────────────────────────────
+    # ── Xác thực ─────────────────────────────────────────────────────────────
 
     def _toggle_auth(self):
         if is_authenticated():
@@ -290,7 +290,7 @@ class MainWindow(QMainWindow):
             dlg.logged_in.connect(self._on_logged_in)
             dlg.exec()
 
-    # ── Queue / playback ──────────────────────────────────────────────────────
+    # ── Hàng đợi và phát nhạc ────────────────────────────────────────────────
 
     def _play_song(self, song: dict):
         if not song.get("videoId"):

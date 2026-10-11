@@ -63,7 +63,7 @@ class SearchTab(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
-        # ── Search bar ──
+        # ── Thanh tìm kiếm ──
         bar = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search songs, artists, albums…")
@@ -108,12 +108,12 @@ class SearchTab(QWidget):
         bar.addWidget(self.btn_search)
         layout.addLayout(bar)
 
-        # ── Status label ──
+        # ── Nhãn trạng thái ──
         self.status_lbl = QLabel("")
         self.status_lbl.setStyleSheet("color:#888aaa; font-size:11px;")
         layout.addWidget(self.status_lbl)
 
-        # ── Results table ──
+        # ── Bảng kết quả ──
         self.table = QTableWidget(0, len(COLUMNS))
         self.table.setHorizontalHeaderLabels(COLUMNS)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)

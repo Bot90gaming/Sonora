@@ -11,7 +11,7 @@ class MusicAPI:
     def __init__(self, ytmusic: YTMusic):
         self.yt = ytmusic
 
-    # ─── Search ───────────────────────────────────────────────────────────────
+    # ─── Tìm kiếm ───────────────────────────────────────────────────────────
 
     def search_songs(self, query: str, limit: int = 20) -> list[dict]:
         results = self.yt.search(query, filter="songs", limit=limit)
@@ -26,7 +26,7 @@ class MusicAPI:
     def search_playlists(self, query: str, limit: int = 20) -> list[dict]:
         return self.yt.search(query, filter="playlists", limit=limit)
 
-    # ─── Library ──────────────────────────────────────────────────────────────
+    # ─── Thư viện ────────────────────────────────────────────────────────────
 
     def get_liked_songs(self, limit: int = 100) -> list[dict]:
         playlist = self.yt.get_liked_songs(limit=limit)
@@ -49,7 +49,7 @@ class MusicAPI:
         tracks = album.get("tracks", [])
         return [self._parse_song(t) for t in tracks]
 
-    # ─── Recommendations ─────────────────────────────────────────────────────
+    # ─── Đề xuất ─────────────────────────────────────────────────────────────
 
     def get_home(self) -> list[dict]:
         return self.yt.get_home()
@@ -64,7 +64,7 @@ class MusicAPI:
                         songs.append(self._parse_song(item))
         return songs
 
-    # ─── Stream URL ───────────────────────────────────────────────────────────
+    # ─── URL luồng phát ──────────────────────────────────────────────────────
 
     def get_stream_url(self, video_id: str) -> str | None:
         """
@@ -83,7 +83,7 @@ class MusicAPI:
             info = ydl.extract_info(url, download=False)
             return info.get("url")
 
-    # ─── Helpers ──────────────────────────────────────────────────────────────
+    # ─── Hàm hỗ trợ ──────────────────────────────────────────────────────────
 
     def _parse_song(self, item: dict) -> dict:
         """Normalise varying API response shapes into a flat song dict."""

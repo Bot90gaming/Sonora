@@ -31,10 +31,10 @@ class SearchPage(Gtk.Box):
         self.on_queue = on_queue
         self._build()
 
-    # ── Construction ──────────────────────────────────────────────────────────
+    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
 
     def _build(self):
-        # ── Top bar (static — never removed) ──────────────────────────────────
+        # ── Thanh trên cùng (cố định, không bị xóa) ──────────────────────────
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bar.set_margin_top(12)
         bar.set_margin_bottom(12)
@@ -60,14 +60,14 @@ class SearchPage(Gtk.Box):
         self.append(bar)
         self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        # ── Content area (dynamic — only this box is ever cleared) ────────────
+        # ── Vùng nội dung (thay đổi; chỉ vùng này được làm trống) ────────────
         self._content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._content.set_vexpand(True)
         self.append(self._content)
 
         self._show_placeholder()
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # ── Hàm hỗ trợ ───────────────────────────────────────────────────────────
 
     def _clear_content(self):
         child = self._content.get_first_child()
@@ -118,7 +118,7 @@ class SearchPage(Gtk.Box):
         page.set_vexpand(True)
         self._content.append(page)
 
-    # ── Callbacks ─────────────────────────────────────────────────────────────
+    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
 
     def _on_search_changed(self, entry):
         if not entry.get_text().strip():

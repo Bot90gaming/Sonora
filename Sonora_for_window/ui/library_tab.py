@@ -73,7 +73,7 @@ class LibraryTab(QWidget):
         layout.setContentsMargins(T.SP_5, T.SP_5, T.SP_5, T.SP_4)
         layout.setSpacing(T.SP_4)
 
-        # ── Section pill buttons ──────────────────────────────────────────────
+        # ── Các nút chọn mục ─────────────────────────────────────────────────
         btn_row = QHBoxLayout()
         btn_row.setSpacing(T.SP_2)
 
@@ -90,7 +90,7 @@ class LibraryTab(QWidget):
 
         btn_row.addStretch()
 
-        # Play all button
+        # Nút phát tất cả
         self.btn_play_all = QPushButton("▶  Play All")
         self.btn_play_all.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_play_all.setFixedHeight(36)
@@ -103,7 +103,7 @@ class LibraryTab(QWidget):
         self.btn_playlists.setChecked(True)
         layout.addLayout(btn_row)
 
-        # ── Status ────────────────────────────────────────────────────────────
+        # ── Trạng thái ───────────────────────────────────────────────────────
         self.status_lbl = QLabel("")
         self.status_lbl.setStyleSheet(f"""
             color: {T.ON_SURFACE_VARIANT};
@@ -111,13 +111,13 @@ class LibraryTab(QWidget):
         """)
         layout.addWidget(self.status_lbl)
 
-        # ── Main content: sidebar list | track table ──────────────────────────
+        # ── Nội dung chính: danh sách bên | bảng bài hát ─────────────────────
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setStyleSheet("""
             QSplitter::handle { background: transparent; width: 8px; }
         """)
 
-        # Sidebar
+        # Thanh bên
         sidebar = QFrame()
         sidebar.setStyleSheet(f"""
             QFrame {{
@@ -135,7 +135,7 @@ class LibraryTab(QWidget):
         sidebar_layout.addWidget(self.list_widget)
         self.splitter.addWidget(sidebar)
 
-        # Track table card
+        # Thẻ bảng bài hát
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame {{
@@ -149,11 +149,11 @@ class LibraryTab(QWidget):
 
         self.track_table = QTableWidget(0, len(TRACK_COLUMNS))
         self.track_table.setHorizontalHeaderLabels(TRACK_COLUMNS)
-        # # column — narrow
+        # Cột số thứ tự — hẹp
         self.track_table.horizontalHeader().setSectionResizeMode(
             0, QHeaderView.ResizeMode.Fixed)
         self.track_table.setColumnWidth(0, 36)
-        # Title — stretch
+        # Tiêu đề — tự giãn
         self.track_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch)
         for col in (2, 3, 4):
@@ -179,20 +179,20 @@ class LibraryTab(QWidget):
         self.splitter.setSizes([220, 900])
         layout.addWidget(self.splitter, stretch=1)
 
-        # Wire section buttons
+        # Kết nối các nút chọn mục
         self.btn_liked.clicked.connect(lambda: self._load("liked"))
         self.btn_playlists.clicked.connect(lambda: self._load("playlists"))
         self.btn_albums.clicked.connect(lambda: self._load("albums"))
 
-        # Load playlists on start
+        # Tải danh sách phát khi khởi động
         self._load("playlists")
 
-    # ── Public ────────────────────────────────────────────────────────────────
+    # ── Phần công khai ───────────────────────────────────────────────────────
 
     def set_liked_visible(self, visible: bool):
         self.btn_liked.setVisible(visible)
 
-    # ── Internal ──────────────────────────────────────────────────────────────
+    # ── Phần nội bộ ──────────────────────────────────────────────────────────
 
     def _uncheck_all(self):
         for b in (self.btn_liked, self.btn_playlists, self.btn_albums):

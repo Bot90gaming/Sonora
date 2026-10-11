@@ -22,9 +22,9 @@ class Downloader:
         artist: str,
         out_dir: Path | str,
         audio_format: str = "mp3",
-        on_progress: callable | None = None,   # (pct: int) -> None
-        on_done:     callable | None = None,   # (path: str) -> None
-        on_error:    callable | None = None,   # (msg: str)  -> None
+        on_progress: callable | None = None,   # Hàm nhận phần trăm tiến độ (số nguyên).
+        on_done:     callable | None = None,   # Hàm nhận đường dẫn tệp sau khi hoàn tất.
+        on_error:    callable | None = None,   # Hàm nhận thông báo lỗi.
     ):
         t = threading.Thread(
             target=self._run,
@@ -34,7 +34,7 @@ class Downloader:
         )
         t.start()
 
-    # ── Worker ────────────────────────────────────────────────────────────────
+    # ── Tác vụ nền ───────────────────────────────────────────────────────────
 
     def _run(self, video_id, title, artist, out_dir: Path,
              audio_format, on_progress, on_done, on_error):

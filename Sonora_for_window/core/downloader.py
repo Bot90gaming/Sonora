@@ -12,9 +12,9 @@ DEFAULT_DOWNLOAD_DIR = Path.home() / "Music" / "YTMusic"
 
 
 class DownloadWorker(QObject):
-    progress   = pyqtSignal(str, float)   # (video_id, percent 0-100)
-    finished   = pyqtSignal(str, str)     # (video_id, file_path)
-    error      = pyqtSignal(str, str)     # (video_id, error_message)
+    progress   = pyqtSignal(str, float)   # (video_id, phần trăm từ 0 đến 100)
+    finished   = pyqtSignal(str, str)     # (video_id, đường dẫn tệp)
+    error      = pyqtSignal(str, str)     # (video_id, thông báo lỗi)
 
     def __init__(self, video_id: str, title: str, artist: str,
                  out_dir: Path = DEFAULT_DOWNLOAD_DIR,
@@ -86,7 +86,7 @@ class Downloader(QObject):
                  out_dir: Path = DEFAULT_DOWNLOAD_DIR,
                  audio_format: str = "mp3"):
         if video_id in self._workers:
-            return  # already downloading
+            return  # Bài hát đang được tải xuống.
 
         thread = QThread()
         worker = DownloadWorker(video_id, title, artist, out_dir, audio_format)

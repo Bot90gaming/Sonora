@@ -1,7 +1,7 @@
-# sonora
+# Sonora
 <div align="center">
 
-# 🎵 YTMusic Player
+# Sonora
 
 **A sleek, cross-platform desktop music player powered by YouTube Music**
 
@@ -121,25 +121,6 @@ Right-click any song → **Download**, or switch to the Downloads tab. Choose yo
 
 ---
 
-## 📁 Project Structure
-
-```
-ytmusic_player/
-├── main.py              # Entry point
-├── requirements.txt
-├── auth/
-│   └── auth_manager.py  # YTMusic client (anonymous)
-├── core/
-│   ├── api.py           # ytmusicapi wrapper
-│   ├── player.py        # QMediaPlayer audio backend
-│   └── downloader.py    # yt-dlp multi-threaded downloader
-└── ui/
-    ├── main_window.py   # App shell & queue management
-    ├── player_bar.py    # Bottom playback bar
-    ├── search_tab.py    # Search UI
-    ├── library_tab.py   # Library UI
-    └── download_tab.py  # Downloads UI
-```
 
 ---
 

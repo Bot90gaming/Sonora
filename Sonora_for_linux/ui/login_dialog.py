@@ -25,7 +25,7 @@ class LoginDialog(Adw.Window):
         self._on_success = on_success
         self._build()
 
-    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
+    # ── Construction ──────────────────────────────────────────────────────────
 
     def _build(self):
         toolbar = Adw.ToolbarView()
@@ -38,7 +38,7 @@ class LoginDialog(Adw.Window):
         content.set_margin_start(24)
         content.set_margin_end(24)
 
-        # Hướng dẫn
+        # Instructions
         steps_lbl = Gtk.Label()
         steps_lbl.set_markup(
             "<b>How to get your browser headers:</b>\n"
@@ -54,7 +54,7 @@ class LoginDialog(Adw.Window):
         steps_lbl.set_selectable(True)
         content.append(steps_lbl)
 
-        # Vùng nhập văn bản
+        # Text area
         sw = Gtk.ScrolledWindow()
         sw.set_vexpand(True)
         sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -66,13 +66,13 @@ class LoginDialog(Adw.Window):
         sw.set_child(self._text)
         content.append(sw)
 
-        # Nhãn trạng thái
+        # Status label
         self._status = Gtk.Label(label="")
         self._status.set_xalign(0)
         self._status.add_css_class("caption")
         content.append(self._status)
 
-        # Các nút
+        # Buttons
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_row.set_halign(Gtk.Align.END)
 
@@ -91,7 +91,7 @@ class LoginDialog(Adw.Window):
         toolbar.set_content(content)
         self.set_content(toolbar)
 
-    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
+    # ── Callbacks ─────────────────────────────────────────────────────────────
 
     def _on_save(self, *_):
         buf = self._text.get_buffer()

@@ -11,13 +11,16 @@ from gi.repository import Gtk, Adw, GLib
 import yt_dlp
 
 from auth.auth_manager import is_authenticated, get_ytmusic_client, logout
-from core.api    import MusicAPI
-from core.player import Player
+from core.api      import MusicAPI
+from core.player   import Player
+from core          import settings as cfg
 from ui.player_bar    import PlayerBar
 from ui.search_page   import SearchPage
 from ui.library_page  import LibraryPage
 from ui.download_page import DownloadPage
 from ui.login_dialog  import LoginDialog
+from ui.settings_page import SettingsPage
+from ui.glass_theme   import apply as apply_glass
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -47,17 +50,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._build()
         self._init_api()
 
-    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
+    # ── Construction ──────────────────────────────────────────────────────────
 
     def _build(self):
-        # Thanh công cụ gốc chứa phần đầu và vùng nội dung.
+        # Root toolbar-view holds header + content
         toolbar_view = Adw.ToolbarView()
 
-        # Thanh tiêu đề
+        # Header bar
         header = Adw.HeaderBar()
         header.set_centering_policy(Adw.CenteringPolicy.STRICT)
 
-        # Nút menu tài khoản (bên phải)
+        # Account menu button (right side)
         self._acct_btn = Gtk.MenuButton()
         self._acct_btn.set_icon_name("avatar-default-symbolic")
         self._acct_btn.set_tooltip_text("Account")
@@ -67,23 +70,25 @@ class MainWindow(Adw.ApplicationWindow):
 
         toolbar_view.add_top_bar(header)
 
-        # Ngăn xếp chế độ xem
+        # ViewStack
         self._stack = Adw.ViewStack()
         self._stack.set_vexpand(True)
 
-        # ── Các trang ────────────────────────────────────────────────────────
+        # ── Pages ─────────────────────────────────────────────────────────────
         self._dl_page = DownloadPage()
 
-        # Trang tìm kiếm và thư viện sẽ nhận API thật sau thông qua _init_api.
+        # search + library get real api later via _init_api
         self._search_page = SearchPage(
             api=_stub_api(),
             on_play=self._play_song,
             on_queue=self._enqueue,
+            on_download=self.download_song,
         )
         self._lib_page = LibraryPage(
             api=_stub_api(),
             on_play=self._play_song,
             on_queue=self._enqueue,
+            on_download=self.download_song,
         )
 
         self._stack.add_titled_with_icon(
@@ -96,18 +101,27 @@ class MainWindow(Adw.ApplicationWindow):
             self._dl_page, "downloads", "Downloads",
             "folder-download-symbolic")
 
-        # Bộ chuyển trang trên thanh tiêu đề
+        self._settings_page = SettingsPage(
+            on_theme_change=self._apply_theme,
+            on_logout=self._on_settings_logout,
+            on_login=self._show_login,
+        )
+        self._stack.add_titled_with_icon(
+            self._settings_page, "settings", "Settings",
+            "preferences-system-symbolic")
+
+        # ViewSwitcher in the header
         switcher = Adw.ViewSwitcher()
         switcher.set_stack(self._stack)
         switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
         header.set_title_widget(switcher)
 
-        # Thanh trình phát (phía dưới)
+        # Player bar (bottom)
         self._player_bar = PlayerBar(self._player)
         self._player_bar.on_next = self._next_track
         self._player_bar.on_prev = self._prev_track
 
-        # Ghép các thành phần giao diện
+        # Assemble
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         content_box.append(self._stack)
         content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
@@ -146,7 +160,7 @@ class MainWindow(Adw.ApplicationWindow):
         popover.set_child(box)
         return popover
 
-    # ── Khởi tạo API ─────────────────────────────────────────────────────────
+    # ── API init ──────────────────────────────────────────────────────────────
 
     def _init_api(self):
         def _build():
@@ -169,7 +183,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._login_btn.set_visible(True)
             self._logout_btn.set_visible(False)
 
-    # ── Phát nhạc ────────────────────────────────────────────────────────────
+    # ── Playback ──────────────────────────────────────────────────────────────
 
     def _play_song(self, song: dict):
         """Play a single song immediately (replaces queue)."""
@@ -190,13 +204,15 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._resolve_and_play,
                          args=(vid,), daemon=True).start()
 
-    def _resolve_and_play(self, video_id: str):
+    def _resolve_and_play(self, video_id: str, attempt: int = 1):
         url = f"https://music.youtube.com/watch?v={video_id}"
         ydl_opts = {
-            "format":       "bestaudio/best",
-            "quiet":        True,
-            "no_warnings":  True,
+            "format":        "bestaudio/best",
+            "quiet":         True,
+            "no_warnings":   True,
             "skip_download": True,
+            # Re-extract a fresh signed URL every attempt
+            "nocache":       True,
             "http_headers": {
                 "User-Agent": (
                     "Mozilla/5.0 (X11; Linux x86_64) "
@@ -211,7 +227,14 @@ class MainWindow(Adw.ApplicationWindow):
                 stream_url = info["url"]
             GLib.idle_add(self._player.play_uri, stream_url)
         except Exception as exc:
-            GLib.idle_add(self._toast, f"Stream error: {exc}")
+            msg = str(exc)
+            # 403 / rate-limit: retry up to 3 times with a short back-off
+            if attempt < 3 and ("403" in msg or "429" in msg or "Forbidden" in msg):
+                import time
+                time.sleep(1.5 * attempt)
+                self._resolve_and_play(video_id, attempt + 1)
+            else:
+                GLib.idle_add(self._toast, f"Stream error (attempt {attempt}): {exc}")
 
     def _next_track(self):
         if self._q_idx + 1 < len(self._queue):
@@ -223,7 +246,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._q_idx -= 1
             self._start_playing(self._queue[self._q_idx])
 
-    # ── Xác thực ─────────────────────────────────────────────────────────────
+    # ── Auth ──────────────────────────────────────────────────────────────────
 
     def _show_login(self, *_):
         self._acct_menu.popdown()
@@ -240,13 +263,24 @@ class MainWindow(Adw.ApplicationWindow):
         self._init_api()
         self._toast("Signed out")
 
-    # ── Hỗ trợ tải xuống ─────────────────────────────────────────────────────
+    # ── Download helper ───────────────────────────────────────────────────────
 
     def download_song(self, song: dict):
         self._stack.set_visible_child_name("downloads")
         self._dl_page.download_song(song)
 
-    # ── Tiện ích ─────────────────────────────────────────────────────────────
+    # ── Utilities ─────────────────────────────────────────────────────────────
+
+    def _apply_theme(self):
+        apply_glass(
+            theme=cfg.get("theme"),
+            glass=cfg.get("glass_effect"),
+            accent=cfg.get("accent"),
+        )
+
+    def _on_settings_logout(self):
+        self._init_api()
+        self._toast("Signed out")
 
     def _toast(self, msg: str):
         toast = Adw.Toast.new(msg)
@@ -254,7 +288,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._toast_overlay.add_toast(toast)
 
 
-# ── API giả (trước khi API thật sẵn sàng) ────────────────────────────────────
+# ── Stub API (before real client is ready) ────────────────────────────────────
 
 class _stub_api:
     def search(self, *a, **kw): return []

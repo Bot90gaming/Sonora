@@ -43,31 +43,33 @@ def load_thumbnail_async(url: str, callback):
     threading.Thread(target=_fetch, daemon=True).start()
 
 
-def track_row(song: dict) -> Gtk.Box:
+def track_row(song: dict,
+              on_queue: callable | None = None,
+              on_download: callable | None = None) -> Gtk.Box:
     """
-    Build a compact horizontal row for one track — used in both Search and Library.
-    The returned box has a `.song` attribute set to the song dict.
+    Build a compact horizontal row for one track.
+    Optionally shows inline Queue and Download icon buttons.
     """
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
     box.set_margin_top(6)
     box.set_margin_bottom(6)
     box.set_margin_start(12)
     box.set_margin_end(12)
-    box.song = song   # Lưu bài hát để truy xuất khi kích hoạt.
+    box.song = song
 
-    # Ảnh bìa giữ chỗ
+    # Thumbnail
     thumb = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
     thumb.set_pixel_size(40)
     thumb.add_css_class("track-thumb")
     box.append(thumb)
 
-    # Tên bài hát và nghệ sĩ
+    # Title + artist
     info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
     info.set_hexpand(True)
 
     lbl_title = Gtk.Label(label=song.get("title", ""))
     lbl_title.set_halign(Gtk.Align.START)
-    lbl_title.set_ellipsize(3)   # Cắt bớt văn bản ở cuối theo quy tắc của Pango.
+    lbl_title.set_ellipsize(3)
     lbl_title.add_css_class("title-4")
 
     lbl_artist = Gtk.Label(label=song.get("artist", ""))
@@ -80,7 +82,7 @@ def track_row(song: dict) -> Gtk.Box:
     info.append(lbl_artist)
     box.append(info)
 
-    # Thời lượng
+    # Duration
     lbl_dur = Gtk.Label(label=fmt_dur(song.get("duration")))
     lbl_dur.add_css_class("caption")
     lbl_dur.add_css_class("dim-label")
@@ -88,7 +90,26 @@ def track_row(song: dict) -> Gtk.Box:
     lbl_dur.set_xalign(1.0)
     box.append(lbl_dur)
 
-    # Tải ảnh bìa nếu có
+    # ── Inline action buttons ────────────────────────────────────────────────
+    if on_queue is not None:
+        btn_q = Gtk.Button()
+        btn_q.set_icon_name("list-add-symbolic")
+        btn_q.set_tooltip_text("Add to queue")
+        btn_q.add_css_class("flat")
+        btn_q.add_css_class("circular")
+        btn_q.connect("clicked", lambda *_: on_queue(song))
+        box.append(btn_q)
+
+    if on_download is not None:
+        btn_dl = Gtk.Button()
+        btn_dl.set_icon_name("folder-download-symbolic")
+        btn_dl.set_tooltip_text("Download")
+        btn_dl.add_css_class("flat")
+        btn_dl.add_css_class("circular")
+        btn_dl.connect("clicked", lambda *_: on_download(song))
+        box.append(btn_dl)
+
+    # Load thumbnail if available
     url = song.get("thumbnail", "")
     if url:
         def _set_thumb(pix):
@@ -101,12 +122,15 @@ def track_row(song: dict) -> Gtk.Box:
 
 def make_track_list(songs: list[dict],
                     on_activate,
+                    on_queue: callable | None = None,
+                    on_download: callable | None = None,
                     on_menu=None) -> Gtk.ScrolledWindow:
     """
     Build a scrollable Gtk.ListBox of track rows.
-    on_activate(song) is called on double-click / Enter.
-    on_menu(song, x, y) is called on right-click (optional).
-    Returns the ScrolledWindow containing the list.
+    on_activate(song)  — double-click / Enter
+    on_queue(song)     — inline queue button (optional)
+    on_download(song)  — inline download button (optional)
+    on_menu(song,x,y)  — right-click (optional)
     """
     lb = Gtk.ListBox()
     lb.set_selection_mode(Gtk.SelectionMode.SINGLE)
@@ -115,7 +139,9 @@ def make_track_list(songs: list[dict],
     for song in songs:
         row = Gtk.ListBoxRow()
         row.song = song
-        row.set_child(track_row(song))
+        row.set_child(track_row(song,
+                                on_queue=on_queue,
+                                on_download=on_download))
         lb.append(row)
 
     def _activated(listbox, row):
@@ -125,7 +151,7 @@ def make_track_list(songs: list[dict],
 
     if on_menu:
         gesture = Gtk.GestureClick()
-        gesture.set_button(3)   # Nhấn chuột phải.
+        gesture.set_button(3)
 
         def _right_click(g, n, x, y):
             row = lb.get_row_at_y(int(y))

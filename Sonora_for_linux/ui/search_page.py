@@ -10,6 +10,7 @@ from gi.repository import Gtk, Adw, GLib
 
 from core.api import MusicAPI
 from ui.widgets import make_track_list
+from ui.easter_egg import maybe_trigger
 
 
 FILTERS = ["songs", "albums", "artists", "playlists", "videos"]
@@ -24,17 +25,19 @@ class SearchPage(Gtk.Box):
 
     def __init__(self, api: MusicAPI,
                  on_play: callable,
-                 on_queue: callable):
+                 on_queue: callable,
+                 on_download: callable | None = None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.api = api
-        self.on_play  = on_play
-        self.on_queue = on_queue
+        self.on_play     = on_play
+        self.on_queue    = on_queue
+        self.on_download = on_download
         self._build()
 
-    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
+    # ── Construction ──────────────────────────────────────────────────────────
 
     def _build(self):
-        # ── Thanh trên cùng (cố định, không bị xóa) ──────────────────────────
+        # ── Top bar (static — never removed) ──────────────────────────────────
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bar.set_margin_top(12)
         bar.set_margin_bottom(12)
@@ -60,14 +63,14 @@ class SearchPage(Gtk.Box):
         self.append(bar)
         self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        # ── Vùng nội dung (thay đổi; chỉ vùng này được làm trống) ────────────
+        # ── Content area (dynamic — only this box is ever cleared) ────────────
         self._content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._content.set_vexpand(True)
         self.append(self._content)
 
         self._show_placeholder()
 
-    # ── Hàm hỗ trợ ───────────────────────────────────────────────────────────
+    # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _clear_content(self):
         child = self._content.get_first_child()
@@ -106,6 +109,8 @@ class SearchPage(Gtk.Box):
             return
         sw = make_track_list(songs,
                              on_activate=self.on_play,
+                             on_queue=self.on_queue,
+                             on_download=self.on_download,
                              on_menu=self._on_menu)
         self._content.append(sw)
 
@@ -118,7 +123,7 @@ class SearchPage(Gtk.Box):
         page.set_vexpand(True)
         self._content.append(page)
 
-    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
+    # ── Callbacks ─────────────────────────────────────────────────────────────
 
     def _on_search_changed(self, entry):
         if not entry.get_text().strip():
@@ -135,6 +140,7 @@ class SearchPage(Gtk.Box):
             try:
                 results = self.api.search(query, filter_=filter_, limit=30)
                 GLib.idle_add(self._show_results, results)
+                GLib.idle_add(maybe_trigger, query, self.get_root())
             except Exception as exc:
                 GLib.idle_add(self._show_error, str(exc))
 

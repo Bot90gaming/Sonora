@@ -28,12 +28,12 @@ class Player:
 
         self._timer_id: int | None = None
 
-        # Gán các giá trị này từ bên ngoài.
+        # Assign these from outside
         self.on_position:     None | callable = None
         self.on_state_change: None | callable = None
         self.on_error:        None | callable = None
 
-    # ── API công khai ────────────────────────────────────────────────────────
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def play_uri(self, uri: str):
         self._pipeline.set_state(Gst.State.NULL)
@@ -82,7 +82,7 @@ class Player:
         ok, dur = self._pipeline.query_duration(Gst.Format.TIME)
         return dur // 1_000_000 if ok else 0
 
-    # ── Phần nội bộ ──────────────────────────────────────────────────────────
+    # ── Internal ──────────────────────────────────────────────────────────────
 
     def _on_bus_message(self, bus, msg):
         if msg.type == Gst.MessageType.EOS:
@@ -110,4 +110,4 @@ class Player:
     def _poll_position(self) -> bool:
         if self.on_position:
             self.on_position(self.get_position_ms(), self.get_duration_ms())
-        return True   # Giữ bộ hẹn giờ tiếp tục hoạt động.
+        return True   # keep the timeout alive

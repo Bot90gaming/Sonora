@@ -9,7 +9,7 @@ class MusicAPI:
     def __init__(self, ytmusic: YTMusic):
         self.yt = ytmusic
 
-    # ── Tìm kiếm ────────────────────────────────────────────────────────────
+    # ── Search ────────────────────────────────────────────────────────────────
 
     def search(self, query: str, filter_: str = "songs", limit: int = 20) -> list[dict]:
         raw = self.yt.search(query, filter=filter_, limit=limit)
@@ -28,7 +28,7 @@ class MusicAPI:
             for r in raw
         ]
 
-    # ── Thư viện ─────────────────────────────────────────────────────────────
+    # ── Library ───────────────────────────────────────────────────────────────
 
     def get_liked_songs(self, limit: int = 100) -> list[dict]:
         return [self._parse_song(t)
@@ -48,7 +48,7 @@ class MusicAPI:
         return [self._parse_song(t)
                 for t in self.yt.get_album(browse_id).get("tracks", [])]
 
-    # ── Hàm hỗ trợ ───────────────────────────────────────────────────────────
+    # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _parse_song(self, item: dict) -> dict:
         artists = item.get("artists") or []

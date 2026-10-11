@@ -23,18 +23,20 @@ class LibraryPage(Gtk.Paned):
 
     def __init__(self, api: MusicAPI,
                  on_play: callable,
-                 on_queue: callable):
+                 on_queue: callable,
+                 on_download: callable | None = None):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
-        self.api      = api
-        self.on_play  = on_play
-        self.on_queue = on_queue
+        self.api         = api
+        self.on_play     = on_play
+        self.on_queue    = on_queue
+        self.on_download = on_download
         self._track_panel: Gtk.Widget | None = None
         self._build()
 
-    # ── Khởi tạo giao diện ───────────────────────────────────────────────────
+    # ── Construction ──────────────────────────────────────────────────────────
 
     def _build(self):
-        # ── Thanh bên trái ───────────────────────────────────────────────────
+        # ── Left sidebar ──────────────────────────────────────────────────────
         sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         sidebar_box.set_size_request(220, -1)
 
@@ -61,7 +63,7 @@ class LibraryPage(Gtk.Paned):
         self.set_resize_start_child(False)
         self.set_shrink_start_child(False)
 
-        # ── Bảng bên phải ────────────────────────────────────────────────────
+        # ── Right panel ───────────────────────────────────────────────────────
         self._right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._right.set_hexpand(True)
 
@@ -75,11 +77,11 @@ class LibraryPage(Gtk.Paned):
         self.set_end_child(self._right)
         self.set_resize_end_child(True)
 
-        # Điền dữ liệu vào thanh bên
+        # Populate sidebar
         self._populate_sidebar()
 
     def _populate_sidebar(self):
-        # Các mục cố định
+        # Static items
         for label, key in [
             ("♥  Liked Songs", "liked"),
             ("── Playlists ──", None),
@@ -98,7 +100,7 @@ class LibraryPage(Gtk.Paned):
             row.set_child(lbl)
             self._sidebar_lb.append(row)
 
-        # Tải danh sách phát và album bất đồng bộ
+        # Load playlists + albums async
         threading.Thread(target=self._fetch_sidebar, daemon=True).start()
 
     def _fetch_sidebar(self):
@@ -127,7 +129,7 @@ class LibraryPage(Gtk.Paned):
             row.set_child(lbl)
             self._sidebar_lb.append(row)
 
-        # Đường phân cách album
+        # Albums separator
         sep_row = Gtk.ListBoxRow()
         sep_row._key = None
         sep_row.set_selectable(False)
@@ -153,7 +155,7 @@ class LibraryPage(Gtk.Paned):
             row.set_child(lbl)
             self._sidebar_lb.append(row)
 
-    # ── Hàm xử lý sự kiện ────────────────────────────────────────────────────
+    # ── Callbacks ─────────────────────────────────────────────────────────────
 
     def _on_sidebar_select(self, lb, row):
         if row is None or not hasattr(row, "_key"):
@@ -176,12 +178,12 @@ class LibraryPage(Gtk.Paned):
                     songs = self.api.get_liked_songs(limit=200)
                 elif kind == "playlist":
                     songs = self.api.get_playlist_tracks(browse_id)
-                else:  # Trường hợp album.
+                else:  # album
                     songs = self.api.get_album_tracks(browse_id)
                 GLib.idle_add(self._show_tracks, songs)
             except Exception as exc:
                 msg = str(exc)
-                # ytmusicapi trả về giá trị này khi chưa đăng nhập.
+                # ytmusicapi returns this when not signed in
                 if "Sign in" in msg or "twoColumn" in msg or "singleColumn" in msg:
                     GLib.idle_add(self._show_not_signed_in)
                 else:
@@ -218,8 +220,11 @@ class LibraryPage(Gtk.Paned):
             page.set_vexpand(True)
             self._right.append(page)
             return
-        sw = make_track_list(songs, on_activate=self.on_play,
-                              on_menu=self._on_menu)
+        sw = make_track_list(songs,
+                             on_activate=self.on_play,
+                             on_queue=self.on_queue,
+                             on_download=self.on_download,
+                             on_menu=self._on_menu)
         self._right.append(sw)
 
     def _show_error(self, msg: str):

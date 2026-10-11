@@ -11,7 +11,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Sonora")
     app.setOrganizationName("Sonora")
-    app.setWindowIcon(QIcon("app.png"))
+    app.setWindowIcon(QIcon("images/app.png"))
 
     # Base font
     font = QFont("Segoe UI", 10)

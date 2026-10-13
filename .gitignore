@@ -1,3 +1,8 @@
 __pycache__
 README.md
 Sonora_for_window(still in dev)
+__pycache__/
+*.pyc
+*.pyo
+.env
+~/.config/ytmusic_player/

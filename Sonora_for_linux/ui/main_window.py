@@ -83,12 +83,14 @@ class MainWindow(Adw.ApplicationWindow):
             on_play=self._play_song,
             on_queue=self._enqueue,
             on_download=self.download_song,
+            on_play_all=self._play_all,
         )
         self._lib_page = LibraryPage(
             api=_stub_api(),
             on_play=self._play_song,
             on_queue=self._enqueue,
             on_download=self.download_song,
+            on_play_all=self._play_all,
         )
 
         self._stack.add_titled_with_icon(
@@ -120,6 +122,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._player_bar = PlayerBar(self._player)
         self._player_bar.on_next = self._next_track
         self._player_bar.on_prev = self._prev_track
+        self._player_bar.on_like = self._on_like_song
 
         # Assemble
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -195,6 +198,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._queue.append(song)
         self._toast("Added to queue")
 
+    def _play_all(self, songs: list[dict]):
+        """Load a full list into the queue and start from the first playable track."""
+        playable = [s for s in songs if s.get("videoId")]
+        if not playable:
+            self._toast("No playable tracks in this playlist")
+            return
+        self._queue = playable
+        self._q_idx = 0
+        self._start_playing(playable[0])
+        self._toast(f"Playing {len(playable)} tracks")
+
     def _start_playing(self, song: dict):
         self._player_bar.load_song(song)
         vid = song.get("videoId", "")
@@ -262,6 +276,26 @@ class MainWindow(Adw.ApplicationWindow):
         self._acct_menu.popdown()
         self._init_api()
         self._toast("Signed out")
+
+    # ── Like ──────────────────────────────────────────────────────────────────
+
+    def _on_like_song(self, video_id: str, liked: bool):
+        if not self._api:
+            self._toast("Sign in to like songs")
+            return
+
+        def _do():
+            try:
+                if liked:
+                    self._api.like_song(video_id)
+                    GLib.idle_add(self._toast, "Added to Liked Songs ♥")
+                else:
+                    self._api.unlike_song(video_id)
+                    GLib.idle_add(self._toast, "Removed from Liked Songs")
+            except Exception as exc:
+                GLib.idle_add(self._toast, f"Could not update like: {exc}")
+
+        threading.Thread(target=_do, daemon=True).start()
 
     # ── Download helper ───────────────────────────────────────────────────────
 

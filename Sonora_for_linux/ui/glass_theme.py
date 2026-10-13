@@ -245,14 +245,6 @@ popover > contents {{
 statuspage {{
     color: {_TEXT_DIM};
 }}
-
-/* ── Settings page ──────────────────────────────────────────────────────────── */
-.settings-page preferencesgroup {{
-    margin: 12px 20px;
-}}
-.settings-page preferencesgroup > row {{
-    padding: 6px 12px;
-}}
 """
 
 

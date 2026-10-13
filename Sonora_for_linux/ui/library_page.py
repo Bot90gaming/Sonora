@@ -24,12 +24,16 @@ class LibraryPage(Gtk.Paned):
     def __init__(self, api: MusicAPI,
                  on_play: callable,
                  on_queue: callable,
-                 on_download: callable | None = None):
+                 on_download: callable | None = None,
+                 on_play_all: callable | None = None):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
-        self.api         = api
-        self.on_play     = on_play
-        self.on_queue    = on_queue
-        self.on_download = on_download
+        self.api          = api
+        self.on_play      = on_play
+        self.on_queue     = on_queue
+        self.on_download  = on_download
+        self.on_play_all  = on_play_all
+        self._current_songs: list[dict] = []
+        self._current_name: str = ""
         self._track_panel: Gtk.Widget | None = None
         self._build()
 
@@ -40,13 +44,28 @@ class LibraryPage(Gtk.Paned):
         sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         sidebar_box.set_size_request(220, -1)
 
+        header_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        header_row.set_margin_top(12)
+        header_row.set_margin_bottom(8)
+        header_row.set_margin_start(16)
+        header_row.set_margin_end(8)
+
         sidebar_header = Gtk.Label(label="Library")
         sidebar_header.add_css_class("heading")
-        sidebar_header.set_margin_top(16)
-        sidebar_header.set_margin_bottom(8)
-        sidebar_header.set_margin_start(16)
         sidebar_header.set_halign(Gtk.Align.START)
-        sidebar_box.append(sidebar_header)
+        sidebar_header.set_hexpand(True)
+        header_row.append(sidebar_header)
+
+        reload_btn = Gtk.Button()
+        reload_btn.set_icon_name("view-refresh-symbolic")
+        reload_btn.set_tooltip_text("Reload library")
+        reload_btn.add_css_class("flat")
+        reload_btn.add_css_class("circular")
+        reload_btn.set_valign(Gtk.Align.CENTER)
+        reload_btn.connect("clicked", self._reload_sidebar)
+        header_row.append(reload_btn)
+
+        sidebar_box.append(header_row)
 
         self._sidebar_lb = Gtk.ListBox()
         self._sidebar_lb.set_selection_mode(Gtk.SelectionMode.SINGLE)
@@ -78,6 +97,17 @@ class LibraryPage(Gtk.Paned):
         self.set_resize_end_child(True)
 
         # Populate sidebar
+        self._populate_sidebar()
+
+    def _reload_sidebar(self, *_):
+        """Clear and re-fetch entire sidebar + reset right panel."""
+        child = self._sidebar_lb.get_first_child()
+        while child:
+            nxt = child.get_next_sibling()
+            self._sidebar_lb.remove(child)
+            child = nxt
+        self._clear_right()
+        self._right.append(self._status)
         self._populate_sidebar()
 
     def _populate_sidebar(self):
@@ -164,12 +194,14 @@ class LibraryPage(Gtk.Paned):
         if key is None:
             return
         if key == "liked":
-            self._load_tracks("liked", None)
+            self._load_tracks("liked", None, "Liked Songs")
         elif isinstance(key, tuple):
             kind, bid = key
-            self._load_tracks(kind, bid)
+            name = getattr(row, "_name", "")
+            self._load_tracks(kind, bid, name)
 
-    def _load_tracks(self, kind: str, browse_id: str | None):
+    def _load_tracks(self, kind: str, browse_id: str | None, name: str = ""):
+        self._current_name = name
         self._show_spinner()
 
         def _fetch():
@@ -213,6 +245,8 @@ class LibraryPage(Gtk.Paned):
 
     def _show_tracks(self, songs: list[dict]):
         self._clear_right()
+        self._current_songs = songs
+
         if not songs:
             page = Adw.StatusPage()
             page.set_icon_name("emblem-music-symbolic")
@@ -220,6 +254,43 @@ class LibraryPage(Gtk.Paned):
             page.set_vexpand(True)
             self._right.append(page)
             return
+
+        # ── Header bar: title + track count + Play All ────────────────────────
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        header.set_margin_top(12)
+        header.set_margin_bottom(8)
+        header.set_margin_start(16)
+        header.set_margin_end(16)
+
+        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        title_box.set_hexpand(True)
+
+        lbl_name = Gtk.Label(label=self._current_name or "Tracks")
+        lbl_name.add_css_class("title-2")
+        lbl_name.set_halign(Gtk.Align.START)
+        lbl_name.set_ellipsize(3)
+        title_box.append(lbl_name)
+
+        lbl_count = Gtk.Label(label=f"{len(songs)} track{'s' if len(songs) != 1 else ''}")
+        lbl_count.add_css_class("caption")
+        lbl_count.add_css_class("dim-label")
+        lbl_count.set_halign(Gtk.Align.START)
+        title_box.append(lbl_count)
+
+        header.append(title_box)
+
+        if self.on_play_all and songs:
+            play_all_btn = Gtk.Button(label="▶  Play All")
+            play_all_btn.add_css_class("suggested-action")
+            play_all_btn.add_css_class("pill")
+            play_all_btn.set_valign(Gtk.Align.CENTER)
+            play_all_btn.connect("clicked",
+                                 lambda *_: self.on_play_all(list(self._current_songs)))
+            header.append(play_all_btn)
+
+        self._right.append(header)
+        self._right.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
         sw = make_track_list(songs,
                              on_activate=self.on_play,
                              on_queue=self.on_queue,

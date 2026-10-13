@@ -22,9 +22,12 @@ class PlayerBar(Gtk.Box):
     def __init__(self, player: Player):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.player = player
-        self._dragging = False
+        self._dragging   = False
+        self._liked       = False
+        self._current_vid = ""
         self.on_next: callable | None = None
         self.on_prev: callable | None = None
+        self.on_like: callable | None = None   # on_like(video_id, liked: bool)
 
         self.add_css_class("toolbar")
         self.set_margin_top(0)
@@ -131,11 +134,22 @@ class PlayerBar(Gtk.Box):
         centre.append(seek_row)
         self.append(centre)
 
-        # ── Right: volume ─────────────────────────────────────────────────────
+        # ── Right: like + volume ──────────────────────────────────────────────
         right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        right.set_size_request(200, -1)
+        right.set_size_request(220, -1)
         right.set_halign(Gtk.Align.END)
         right.set_valign(Gtk.Align.CENTER)
+
+        # Like / heart button
+        self._like_btn = Gtk.ToggleButton()
+        self._like_btn.set_icon_name("emblem-favorite-symbolic")
+        self._like_btn.set_tooltip_text("Like this song")
+        self._like_btn.set_valign(Gtk.Align.CENTER)
+        self._like_btn.add_css_class("flat")
+        self._like_btn.add_css_class("circular")
+        self._like_btn.set_sensitive(False)   # disabled until a song loads
+        self._like_btn.connect("toggled", self._on_like_toggled)
+        right.append(self._like_btn)
 
         vol_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
         right.append(vol_icon)
@@ -158,6 +172,16 @@ class PlayerBar(Gtk.Box):
         url = song.get("thumbnail", "")
         if url:
             load_thumbnail_async(url, self._set_thumb)
+
+        # Reset like state for new song
+        self._current_vid = song.get("videoId", "")
+        self._liked = False
+        # Block signal to avoid triggering the callback while resetting
+        self._like_btn.handler_block_by_func(self._on_like_toggled)
+        self._like_btn.set_active(False)
+        self._like_btn.set_sensitive(bool(self._current_vid))
+        self._like_btn.handler_unblock_by_func(self._on_like_toggled)
+        self._update_like_style()
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
 
@@ -188,6 +212,18 @@ class PlayerBar(Gtk.Box):
         if state == "ended" and self.on_next:
             self.on_next()
 
+    def _on_like_toggled(self, btn):
+        self._liked = btn.get_active()
+        self._update_like_style()
+        if self.on_like and self._current_vid:
+            self.on_like(self._current_vid, self._liked)
+
+    def _update_like_style(self):
+        if self._liked:
+            self._like_btn.add_css_class("accent")
+        else:
+            self._like_btn.remove_css_class("accent")
+
     def _on_error(self, msg: str):
         self._lbl_title.set_label(f"Error: {msg}")
 
@@ -202,6 +238,7 @@ def _icon_btn(icon: str, tooltip: str) -> Gtk.Button:
     btn = Gtk.Button()
     btn.set_icon_name(icon)
     btn.set_tooltip_text(tooltip)
+    btn.set_valign(Gtk.Align.CENTER)
     btn.add_css_class("circular")
     btn.add_css_class("flat")
     return btn

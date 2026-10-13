@@ -17,13 +17,16 @@ class MusicAPI:
             return [self._parse_song(r) for r in raw]
         return [
             {
-                "videoId":   r.get("videoId", ""),
-                "title":     r.get("title", r.get("name", "Unknown")),
-                "artist":    ", ".join(a.get("name", "") for a in r.get("artists", []))
-                             if isinstance(r.get("artists"), list) else r.get("artist", ""),
-                "album":     (r.get("album") or {}).get("name", ""),
-                "duration":  r.get("duration_seconds") or r.get("duration") or 0,
-                "thumbnail": (r.get("thumbnails") or [{}])[-1].get("url", ""),
+                "videoId":    r.get("videoId", ""),
+                "playlistId": r.get("playlistId") or r.get("browseId", ""),
+                "browseId":   r.get("browseId", ""),
+                "title":      r.get("title", r.get("name", "Unknown")),
+                "artist":     ", ".join(a.get("name", "") for a in r.get("artists", []))
+                              if isinstance(r.get("artists"), list) else r.get("artist", ""),
+                "album":      (r.get("album") or {}).get("name", ""),
+                "duration":   r.get("duration_seconds") or r.get("duration") or 0,
+                "thumbnail":  (r.get("thumbnails") or [{}])[-1].get("url", ""),
+                "count":      r.get("count", ""),   # playlist / album track count string
             }
             for r in raw
         ]
@@ -48,6 +51,16 @@ class MusicAPI:
         return [self._parse_song(t)
                 for t in self.yt.get_album(browse_id).get("tracks", [])]
 
+    # ── Like / Rate ───────────────────────────────────────────────────────────
+
+    def like_song(self, video_id: str) -> None:
+        """Rate a song as LIKE."""
+        self.yt.rate_song(video_id, "LIKE")
+
+    def unlike_song(self, video_id: str) -> None:
+        """Remove like (set to INDIFFERENT)."""
+        self.yt.rate_song(video_id, "INDIFFERENT")
+
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _parse_song(self, item: dict) -> dict:
@@ -70,8 +83,13 @@ class MusicAPI:
             except (ValueError, IndexError):
                 dur = 0
 
+        # videoId can live at top-level or nested (e.g. album tracks use .videoId inside track)
+        video_id = (item.get("videoId")
+                    or (item.get("video") or {}).get("videoId", "")
+                    or "")
+
         return {
-            "videoId":   item.get("videoId", ""),
+            "videoId":   video_id,
             "title":     item.get("title", "Unknown Title"),
             "artist":    artist,
             "album":     album_name,

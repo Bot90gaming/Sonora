@@ -35,12 +35,10 @@ class SettingsPage(Adw.PreferencesPage):
         super().__init__()
         self.set_title("Settings")
         self.set_icon_name("preferences-system-symbolic")
-        self.add_css_class("settings-page")
         self._on_theme_change = on_theme_change
         self._on_logout       = on_logout
         self._on_login        = on_login
         self._build()
-        self._widen_content()
 
     # ── Build ─────────────────────────────────────────────────────────────────
 
@@ -50,22 +48,6 @@ class SettingsPage(Adw.PreferencesPage):
         self._build_playback()
         self._build_downloads()
         self._build_about()
-
-    def _widen_content(self):
-        # PreferencesPage uses an internal clamp to limit its content width.
-        pending = [self.get_first_child()]
-        while pending:
-            widget = pending.pop()
-            if widget is None:
-                continue
-            if isinstance(widget, Adw.Clamp):
-                widget.set_maximum_size(1040)
-                return
-            child = widget.get_first_child()
-            while child:
-                pending.append(child)
-                child = child.get_next_sibling()
-        raise RuntimeError("Could not find the Settings page content clamp")
 
     # ── Appearance ────────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 """
-Sonora — GTK4 + libadwaita entry point (Linux).
+YTMusic Player — GTK4 + libadwaita entry point (Linux).
 """
 import sys
 import gi
@@ -13,7 +13,7 @@ Gst.init(None)
 
 
 def main():
-    app = Adw.Application(application_id="io.github.sonora")
+    app = Adw.Application(application_id="io.github.ytmusic_player")
 
     # Force dark colour scheme to match our purple aesthetic
     app.connect("activate", _on_activate)

@@ -6,4 +6,4 @@ Terminal=false
 Type=Application
 Categories=Audio;Music;Player;
 StartupWMClass=sonora
-Icon=/path/to/assets/icons/sonora_512
+Icon=~/Sonora/assets/icons/sonora_512.png

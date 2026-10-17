@@ -22,6 +22,7 @@ _ACCENT_GLOW    = "rgba(167,139,250,0.35)"
 _TEXT_DIM       = "rgba(255,255,255,0.45)"
 _SHADOW         = "rgba(0, 0, 0, 0.55)"
 _PROGRESS_TROUGH = "__PROGRESS_TROUGH__"
+_ACCOUNT_POPOVER_BG = "__ACCOUNT_POPOVER_BG__"
 
 CSS = f"""
 /* ── Window / root ────────────────────────────────────────────────────────── */
@@ -342,6 +343,37 @@ popover > contents {{
     box-shadow: 0 8px 32px {_SHADOW};
 }}
 
+popover.account-popover {{
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}}
+popover.account-popover > contents {{
+    background-color: {_ACCOUNT_POPOVER_BG};
+    border: 1px solid {_GLASS_BORDER2};
+    border-radius: 16px;
+    box-shadow: 0 10px 30px {_SHADOW};
+    padding: 2px;
+}}
+.account-menu-content {{
+    background-color: transparent;
+}}
+.account-menu-status {{
+    padding: 6px 8px;
+}}
+button.account-menu-action {{
+    background-color: transparent;
+    border: none;
+    border-radius: 10px;
+    box-shadow: none;
+    color: #e2e2f0;
+    padding: 8px 10px;
+}}
+button.account-menu-action:hover {{
+    background-color: {_GLASS_SURFACE2};
+}}
+
 /* ── Status page ─────────────────────────────────────────────────────────────── */
 statuspage {{
     color: {_TEXT_DIM};
@@ -453,6 +485,11 @@ def _build_css(acc: str, glow: str, surface: str, surface2: str,
     sidebar_bg = "rgba(15,13,28,0.60)" if is_dark else "rgba(238,235,246,0.90)"
     toolbar_bg = "rgba(12,10,22,0.88)" if is_dark else "rgba(255,255,255,0.92)"
     popover_bg = "rgba(20,18,36,0.92)" if is_dark else "rgba(255,255,255,0.98)"
+    account_popover_bg = (
+        "rgba(20,18,36,0.72)" if is_dark else "rgba(255,255,255,0.76)"
+    ) if glass else (
+        "rgba(30,28,48,0.98)" if is_dark else "rgba(255,255,255,0.98)"
+    )
     scale_trough = "rgba(255,255,255,0.12)" if is_dark else "rgba(35,25,55,0.14)"
     scale_slider = "#ffffff" if is_dark else "#615b70"
     scrollbar = "rgba(255,255,255,0.18)" if is_dark else "rgba(35,25,55,0.20)"
@@ -474,6 +511,7 @@ def _build_css(acc: str, glow: str, surface: str, surface2: str,
         "rgba(15, 13, 28, 0.60)": sidebar_bg,
         "rgba(12, 10, 22, 0.88)": toolbar_bg,
         "rgba(20, 18, 36, 0.92)": popover_bg,
+        _ACCOUNT_POPOVER_BG: account_popover_bg,
         _GLASS_SURFACE: surface,
         _GLASS_SURFACE2: surface2,
         _PROGRESS_TROUGH: progress_trough,

@@ -142,10 +142,12 @@ class MainWindow(Adw.ApplicationWindow):
         box.set_margin_bottom(8)
         box.set_margin_start(8)
         box.set_margin_end(8)
+        box.add_css_class("account-menu-content")
 
         self._acct_lbl = Gtk.Label(label="Not signed in")
         self._acct_lbl.add_css_class("caption")
         self._acct_lbl.add_css_class("dim-label")
+        self._acct_lbl.add_css_class("account-menu-status")
         box.append(self._acct_lbl)
 
         sep = Gtk.Separator()
@@ -153,15 +155,18 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._login_btn = Gtk.Button(label="Sign in…")
         self._login_btn.add_css_class("flat")
+        self._login_btn.add_css_class("account-menu-action")
         self._login_btn.connect("clicked", self._show_login)
         box.append(self._login_btn)
 
         self._logout_btn = Gtk.Button(label="Sign out")
         self._logout_btn.add_css_class("flat")
+        self._logout_btn.add_css_class("account-menu-action")
         self._logout_btn.connect("clicked", self._do_logout)
         box.append(self._logout_btn)
 
         popover = Gtk.Popover()
+        popover.add_css_class("account-popover")
         popover.set_child(box)
         return popover
 

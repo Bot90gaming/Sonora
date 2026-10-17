@@ -2,34 +2,99 @@
 Wrapper around ytmusicapi — no framework dependency.
 """
 from __future__ import annotations
+import json
+import logging
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 from ytmusicapi import YTMusic
+
+logger = logging.getLogger(__name__)
+
+
+class _HTMLTitleParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._in_title = False
+        self.title = ""
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "title":
+            self._in_title = True
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "title":
+            self._in_title = False
+
+    def handle_data(self, data):
+        if self._in_title:
+            self.title += data
+
+
+def _log_response_metadata(response, *args, **kwargs):
+    content_type = response.headers.get("Content-Type", "unknown")
+    invalid_json = False
+    title = ""
+    if response.content and "json" in content_type.lower():
+        try:
+            response.json()
+        except ValueError:
+            invalid_json = True
+    elif response.content and "html" in content_type.lower():
+        title_parser = _HTMLTitleParser()
+        title_parser.feed(response.text)
+        title = " ".join(title_parser.title.split())[:120]
+
+    if (response.status_code >= 400 or not response.content or invalid_json
+            or "json" not in content_type.lower()):
+        path = urlsplit(response.url).path
+        logger.warning(
+            "YouTube Music returned an unexpected response "
+            "(status=%d, path=%s, content_type=%s, bytes=%d, "
+            "invalid_json=%s, html_title=%r)",
+            response.status_code, path, content_type, len(response.content),
+            invalid_json, title,
+        )
+    return response
 
 
 class MusicAPI:
     def __init__(self, ytmusic: YTMusic):
         self.yt = ytmusic
+        self.yt._session.hooks["response"].append(_log_response_metadata)
 
     # ── Search ────────────────────────────────────────────────────────────────
 
     def search(self, query: str, filter_: str = "songs", limit: int = 20) -> list[dict]:
-        raw = self.yt.search(query, filter=filter_, limit=limit)
+        logger.debug("Searching YouTube Music (filter=%s, limit=%d)", filter_, limit)
+        try:
+            raw = self.yt.search(query, filter=filter_, limit=limit)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                "YouTube Music returned an empty or invalid response. "
+                "Check the terminal log for HTTP status and response metadata. "
+                "HTTP 400 means the request was rejected; HTTP 401 or 403 may "
+                "mean the saved sign-in has expired."
+            ) from exc
         if filter_ == "songs":
-            return [self._parse_song(r) for r in raw]
-        return [
-            {
-                "videoId":    r.get("videoId", ""),
-                "playlistId": r.get("playlistId") or r.get("browseId", ""),
-                "browseId":   r.get("browseId", ""),
-                "title":      r.get("title", r.get("name", "Unknown")),
-                "artist":     ", ".join(a.get("name", "") for a in r.get("artists", []))
-                              if isinstance(r.get("artists"), list) else r.get("artist", ""),
-                "album":      (r.get("album") or {}).get("name", ""),
-                "duration":   r.get("duration_seconds") or r.get("duration") or 0,
-                "thumbnail":  (r.get("thumbnails") or [{}])[-1].get("url", ""),
-                "count":      r.get("count", ""),   # playlist / album track count string
-            }
-            for r in raw
-        ]
+            results = [self._parse_song(r) for r in raw]
+        else:
+            results = [
+                {
+                    "videoId":    r.get("videoId", ""),
+                    "playlistId": r.get("playlistId") or r.get("browseId", ""),
+                    "browseId":   r.get("browseId", ""),
+                    "title":      r.get("title", r.get("name", "Unknown")),
+                    "artist":     ", ".join(a.get("name", "") for a in r.get("artists", []))
+                                  if isinstance(r.get("artists"), list) else r.get("artist", ""),
+                    "album":      (r.get("album") or {}).get("name", ""),
+                    "duration":   r.get("duration_seconds") or r.get("duration") or 0,
+                    "thumbnail":  (r.get("thumbnails") or [{}])[-1].get("url", ""),
+                    "count":      r.get("count", ""),   # playlist / album track count string
+                }
+                for r in raw
+            ]
+        logger.debug("Search returned %d results", len(results))
+        return results
 
     # ── Library ───────────────────────────────────────────────────────────────
 

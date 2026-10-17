@@ -9,14 +9,14 @@ from pathlib import Path
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, Adw
 
 from core import settings as cfg
-from auth.auth_manager import is_authenticated, logout
+from auth.auth_manager import logout
+from ui.choice_dropdown import ChoiceDropDown
 
 _THEMES      = ["Dark", "Light", "System"]
 _THEME_KEYS  = ["dark", "light", "system"]
-_ACCENTS     = ["Violet", "Blue", "Green", "Rose", "Orange"]
 _ACCENT_KEYS = ["violet", "blue", "green", "rose", "orange"]
 _ACCENT_HEX  = {
     "violet": "#a78bfa", "blue": "#60a5fa", "green": "#34d399",
@@ -43,6 +43,8 @@ class SettingsPage(Adw.PreferencesPage):
     # ── Build ─────────────────────────────────────────────────────────────────
 
     def _build(self):
+        self._settings_group = Adw.PreferencesGroup()
+        self.add(self._settings_group)
         self._build_appearance()
         self._build_account()
         self._build_playback()
@@ -52,20 +54,18 @@ class SettingsPage(Adw.PreferencesPage):
     # ── Appearance ────────────────────────────────────────────────────────────
 
     def _build_appearance(self):
-        group = Adw.PreferencesGroup()
-        group.set_title("Appearance")
-        group.set_description("Visual style and colour theme")
-        group.set_header_suffix(_group_icon("color-select-symbolic"))
+        group = self._settings_group
 
         # Theme
-        theme_row = Adw.ComboRow()
-        theme_row.set_title("Colour scheme")
-        theme_row.set_subtitle("Choose between dark, light or follow the system")
-        theme_row.set_icon_name("weather-clear-night-symbolic")
-        theme_row.set_model(Gtk.StringList.new(_THEMES))
-        theme_row.set_selected(
-            _idx(_THEME_KEYS, cfg.get("theme"), 0))
-        theme_row.connect("notify::selected", self._on_theme_row)
+        theme_row = self._choice_row(
+            "Colour scheme",
+            "Choose between dark, light or follow the system",
+            "weather-clear-night-symbolic",
+            _THEMES,
+            _idx(_THEME_KEYS, cfg.get("theme"), 0),
+            self._on_theme_selected,
+            width=118,
+        )
         group.add(theme_row)
 
         # Glass
@@ -106,23 +106,10 @@ class SettingsPage(Adw.PreferencesPage):
         accent_row.add_suffix(swatch_box)
         group.add(accent_row)
 
-        self.add(group)
-
     # ── Account ───────────────────────────────────────────────────────────────
 
     def _build_account(self):
-        group = Adw.PreferencesGroup()
-        group.set_title("Account")
-        group.set_description("YouTube Music authentication")
-        group.set_header_suffix(_group_icon("avatar-default-symbolic"))
-
-        # Status banner
-        self._acct_banner = Adw.Banner()
-        self._acct_banner.set_use_markup(True)
-        self._acct_banner.set_revealed(True)
-        self._acct_banner.set_button_label("")
-        self._refresh_banner()
-        group.add(self._acct_banner)
+        group = self._settings_group
 
         # Sign in row
         signin_row = Adw.ActionRow()
@@ -150,37 +137,25 @@ class SettingsPage(Adw.PreferencesPage):
         signout_row.add_suffix(signout_btn)
         group.add(signout_row)
 
-        self.add(group)
-
-    def _refresh_banner(self):
-        if is_authenticated():
-            self._acct_banner.set_title("✓  Signed in to YouTube Music")
-        else:
-            self._acct_banner.set_title("Not signed in — library features are unavailable")
-
     def _do_signout(self, *_):
         logout()
-        self._refresh_banner()
         if self._on_logout:
             self._on_logout()
 
     # ── Playback ──────────────────────────────────────────────────────────────
 
     def _build_playback(self):
-        group = Adw.PreferencesGroup()
-        group.set_title("Playback")
-        group.set_description("Streaming quality and behaviour")
-        group.set_header_suffix(_group_icon("media-playback-start-symbolic"))
+        group = self._settings_group
 
-        q_row = Adw.ComboRow()
-        q_row.set_title("Stream quality")
-        q_row.set_subtitle("Higher quality uses more bandwidth")
-        q_row.set_icon_name("audio-headphones-symbolic")
-        q_row.set_model(Gtk.StringList.new(_QUALITY))
-        q_row.set_selected(_idx(_QUALITY_KEYS, cfg.get("audio_quality"), 0))
-        q_row.connect("notify::selected",
-                      lambda r, *_: cfg.set("audio_quality",
-                                            _QUALITY_KEYS[r.get_selected()]))
+        q_row = self._choice_row(
+            "Stream quality",
+            "Higher quality uses more bandwidth",
+            "audio-headphones-symbolic",
+            _QUALITY,
+            _idx(_QUALITY_KEYS, cfg.get("audio_quality"), 0),
+            lambda index: cfg.set("audio_quality", _QUALITY_KEYS[index]),
+            width=260,
+        )
         group.add(q_row)
 
         autonext_row = Adw.SwitchRow()
@@ -192,15 +167,10 @@ class SettingsPage(Adw.PreferencesPage):
                              lambda r, *_: cfg.set("autonext", r.get_active()))
         group.add(autonext_row)
 
-        self.add(group)
-
     # ── Downloads ─────────────────────────────────────────────────────────────
 
     def _build_downloads(self):
-        group = Adw.PreferencesGroup()
-        group.set_title("Downloads")
-        group.set_description("Where and how audio files are saved")
-        group.set_header_suffix(_group_icon("folder-download-symbolic"))
+        group = self._settings_group
 
         saved_dir = cfg.get("download_dir") or str(
             Path(os.environ.get("XDG_MUSIC_DIR") or Path.home() / "Music"))
@@ -234,19 +204,26 @@ class SettingsPage(Adw.PreferencesPage):
         folder_row.add_suffix(btn_box)
         group.add(folder_row)
 
-        fmt_row = Adw.ComboRow()
-        fmt_row.set_title("Audio format")
-        fmt_row.set_subtitle("Format used when converting downloaded audio")
-        fmt_row.set_icon_name("audio-x-generic-symbolic")
-        fmt_row.set_model(Gtk.StringList.new(_FORMATS))
-        fmt_row.set_selected(
-            _idx(_FORMATS, cfg.get("download_format"), 0))
-        fmt_row.connect("notify::selected",
-                        lambda r, *_: cfg.set("download_format",
-                                              _FORMATS[r.get_selected()]))
+        fmt_row = self._choice_row(
+            "Audio format",
+            "Format used when converting downloaded audio",
+            "audio-x-generic-symbolic",
+            _FORMATS,
+            _idx(_FORMATS, cfg.get("download_format"), 0),
+            lambda index: cfg.set("download_format", _FORMATS[index]),
+            width=96,
+        )
         group.add(fmt_row)
 
-        self.add(group)
+    def _choice_row(self, title, subtitle, icon, choices, selected,
+                    on_changed, width=-1):
+        row = Adw.ActionRow()
+        row.set_title(title)
+        row.set_subtitle(subtitle)
+        row.set_icon_name(icon)
+        row.add_suffix(ChoiceDropDown(
+            choices, selected=selected, on_changed=on_changed, width=width))
+        return row
 
     def _pick_folder(self, *_):
         d = Gtk.FileDialog()
@@ -265,9 +242,7 @@ class SettingsPage(Adw.PreferencesPage):
     # ── About ─────────────────────────────────────────────────────────────────
 
     def _build_about(self):
-        group = Adw.PreferencesGroup()
-        group.set_title("About")
-        group.set_header_suffix(_group_icon("help-about-symbolic"))
+        group = self._settings_group
 
         name_row = Adw.ActionRow()
         name_row.set_title("Sonora")
@@ -293,12 +268,10 @@ class SettingsPage(Adw.PreferencesPage):
             row.add_suffix(lbl)
             group.add(row)
 
-        self.add(group)
-
     # ── Callbacks ─────────────────────────────────────────────────────────────
 
-    def _on_theme_row(self, row, _):
-        cfg.set("theme", _THEME_KEYS[row.get_selected()])
+    def _on_theme_selected(self, index: int):
+        cfg.set("theme", _THEME_KEYS[index])
         if self._on_theme_change:
             self._on_theme_change()
 
@@ -322,15 +295,6 @@ class SettingsPage(Adw.PreferencesPage):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _group_icon(icon_name: str) -> Gtk.Image:
-    img = Gtk.Image.new_from_icon_name(icon_name)
-    img.set_pixel_size(16)
-    img.set_valign(Gtk.Align.CENTER)
-    img.add_css_class("dim-label")
-    return img
-
-
 def _apply_swatch_css(widget: Gtk.Widget, hex_colour: str):
     provider = Gtk.CssProvider()
     provider.load_from_string(f"""

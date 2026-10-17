@@ -9,9 +9,10 @@ from pathlib import Path
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, Adw
 
 from core.downloader import Downloader
+from ui.choice_dropdown import ChoiceDropDown
 
 
 _DEFAULT_DIR = Path(
@@ -31,7 +32,6 @@ class DownloadPage(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self._downloader = Downloader()
         self._out_dir = _DEFAULT_DIR
-        self._fmt_idx = 0   # mp3 default
         self._build()
 
     # ── Construction ──────────────────────────────────────────────────────────
@@ -55,9 +55,7 @@ class DownloadPage(Gtk.Box):
         fmt_lbl = Gtk.Label(label="Format:")
         fmt_lbl.add_css_class("caption")
 
-        self._fmt_drop = Gtk.DropDown.new_from_strings(_FORMATS)
-        self._fmt_drop.set_selected(0)
-        self._fmt_drop.connect("notify::selected", self._on_fmt_change)
+        self._fmt_drop = ChoiceDropDown(_FORMATS, width=96)
 
         open_btn = Gtk.Button(label="Open folder")
         open_btn.add_css_class("flat")
@@ -73,7 +71,6 @@ class DownloadPage(Gtk.Box):
         bar.append(open_btn)
 
         # Make spacer expand
-        bar.get_first_child()  # dir_lbl — walk to spacer
         spacer = open_btn.get_prev_sibling()
         spacer.set_hexpand(True)
 
@@ -147,10 +144,6 @@ class DownloadPage(Gtk.Box):
             self._dir_btn.set_label(str(self._out_dir))
         except Exception:
             pass
-
-    def _on_fmt_change(self, drop, _pspec):
-        self._fmt_idx = drop.get_selected()
-
 
 # ── Download card ─────────────────────────────────────────────────────────────
 

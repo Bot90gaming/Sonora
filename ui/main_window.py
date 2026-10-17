@@ -2,6 +2,7 @@
 Main application window — GTK4 / Adwaita.
 """
 from __future__ import annotations
+import logging
 import threading
 import gi
 gi.require_version('Gtk', '4.0')
@@ -21,6 +22,8 @@ from ui.download_page import DownloadPage
 from ui.login_dialog  import LoginDialog
 from ui.settings_page import SettingsPage
 from ui.glass_theme   import apply as apply_glass
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -127,7 +130,6 @@ class MainWindow(Adw.ApplicationWindow):
         # Assemble
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         content_box.append(self._stack)
-        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         content_box.append(self._player_bar)
 
         self._toast_overlay.set_child(content_box)
@@ -167,13 +169,20 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _init_api(self):
         def _build():
-            client = get_ytmusic_client()
-            api    = MusicAPI(client)
-            GLib.idle_add(self._apply_api, api)
+            try:
+                client = get_ytmusic_client()
+                api    = MusicAPI(client)
+                GLib.idle_add(self._apply_api, api)
+            except Exception:
+                logger.exception("Could not initialize YouTube Music API")
 
         threading.Thread(target=_build, daemon=True).start()
 
     def _apply_api(self, api: MusicAPI):
+        logger.info(
+            "YouTube Music API initialized (saved_auth=%s)",
+            is_authenticated(),
+        )
         self._api = api
         self._search_page.api = api
         self._lib_page.api    = api
@@ -215,18 +224,32 @@ class MainWindow(Adw.ApplicationWindow):
         if not vid:
             self._toast("No video ID — cannot play")
             return
-        threading.Thread(target=self._resolve_and_play,
+        logger.info("Starting track playback (video_id=%s)", vid)
+        # Show loading state in player bar
+        GLib.idle_add(self._player_bar.set_loading, True)
+        threading.Thread(target=self._download_and_play,
                          args=(vid,), daemon=True).start()
 
-    def _resolve_and_play(self, video_id: str, attempt: int = 1):
+    def _download_and_play(self, video_id: str, attempt: int = 1):
+        """
+        Download the audio to a temp file then play from disk.
+        This avoids mid-stream TLS drops that happen when GStreamer
+        tries to play YouTube CDN URLs directly.
+        """
+        import tempfile, os, time, glob
         url = f"https://music.youtube.com/watch?v={video_id}"
+        tmp_dir  = tempfile.gettempdir()
+        tmp_path = os.path.join(tmp_dir, f"sonora_{video_id}.%(ext)s")
+
         ydl_opts = {
-            "format":        "bestaudio/best",
-            "quiet":         True,
-            "no_warnings":   True,
-            "skip_download": True,
-            # Re-extract a fresh signed URL every attempt
-            "nocache":       True,
+            # webm/opus is supported by gst-plugins-good (always installed).
+            # m4a/AAC needs gst-libav or gst-plugins-bad — prefer webm to avoid
+            # the "gst-stream-error-quark: Internal data stream error" crash.
+            "format":      "bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio[ext=m4a]/bestaudio/best",
+            "quiet":       True,
+            "no_warnings": True,
+            "nocache":     True,
+            "outtmpl":     tmp_path,
             "http_headers": {
                 "User-Agent": (
                     "Mozilla/5.0 (X11; Linux x86_64) "
@@ -237,18 +260,53 @@ class MainWindow(Adw.ApplicationWindow):
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                stream_url = info["url"]
-            GLib.idle_add(self._player.play_uri, stream_url)
+                info     = ydl.extract_info(url, download=True)
+                ext      = info.get("ext", "webm")
+                out_file = os.path.join(tmp_dir, f"sonora_{video_id}.{ext}")
+                # yt-dlp may pick a different ext than what the template used;
+                # scan for the actual file if the expected path doesn't exist.
+                if not os.path.exists(out_file):
+                    for candidate in glob.glob(
+                            os.path.join(tmp_dir, f"sonora_{video_id}.*")):
+                        out_file = candidate
+                        break
+
+            logger.debug("Audio prepared for playback (video_id=%s, format=%s)",
+                         video_id, ext)
+            file_uri = f"file://{out_file}"
+            GLib.idle_add(self._player_bar.set_loading, False)
+            GLib.idle_add(self._player.play_uri, file_uri)
+
+            # Clean up older temp files (keep only last 5) to save disk space
+            self._cleanup_temp_files(tmp_dir, video_id)
+
         except Exception as exc:
             msg = str(exc)
-            # 403 / rate-limit: retry up to 3 times with a short back-off
-            if attempt < 3 and ("403" in msg or "429" in msg or "Forbidden" in msg):
-                import time
+            if attempt < 3 and ("403" in msg or "429" in msg or "Forbidden" in msg
+                                 or "connection" in msg.lower()):
+                logger.warning("Playback attempt %d failed; retrying (video_id=%s): %s",
+                               attempt, video_id, msg)
                 time.sleep(1.5 * attempt)
-                self._resolve_and_play(video_id, attempt + 1)
+                self._download_and_play(video_id, attempt + 1)
             else:
-                GLib.idle_add(self._toast, f"Stream error (attempt {attempt}): {exc}")
+                logger.exception("Playback failed (video_id=%s)", video_id)
+                GLib.idle_add(self._player_bar.set_loading, False)
+                GLib.idle_add(self._toast, f"Playback error: {exc}")
+
+    def _cleanup_temp_files(self, tmp_dir: str, current_id: str):
+        """Remove old sonora_* temp files, keeping only the current one."""
+        import os, glob
+        files = sorted(glob.glob(os.path.join(tmp_dir, "sonora_*.m4a")) +
+                       glob.glob(os.path.join(tmp_dir, "sonora_*.webm")) +
+                       glob.glob(os.path.join(tmp_dir, "sonora_*.opus")) +
+                       glob.glob(os.path.join(tmp_dir, "sonora_*.ogg")),
+                       key=os.path.getmtime)
+        for f in files:
+            if current_id not in f and len(files) > 5:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
 
     def _next_track(self):
         if self._q_idx + 1 < len(self._queue):
@@ -293,6 +351,7 @@ class MainWindow(Adw.ApplicationWindow):
                     self._api.unlike_song(video_id)
                     GLib.idle_add(self._toast, "Removed from Liked Songs")
             except Exception as exc:
+                logger.exception("Could not update liked-song status")
                 GLib.idle_add(self._toast, f"Could not update like: {exc}")
 
         threading.Thread(target=_do, daemon=True).start()

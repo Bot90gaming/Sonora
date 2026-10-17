@@ -7,9 +7,12 @@ Callbacks (set externally, called on the GLib main loop):
     on_error(message)
 """
 from __future__ import annotations
+import logging
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GLib
+
+logger = logging.getLogger(__name__)
 
 
 class Player:
@@ -21,6 +24,8 @@ class Player:
                 "Install: sudo apt install gstreamer1.0-plugins-base"
             )
         self._pipeline.set_property("volume", 0.8)
+        self._uri: str | None = None
+        self._loop_enabled = False
 
         bus = self._pipeline.get_bus()
         bus.add_signal_watch()
@@ -36,6 +41,8 @@ class Player:
     # ── Public API ────────────────────────────────────────────────────────────
 
     def play_uri(self, uri: str):
+        logger.debug("Starting playback")
+        self._uri = uri
         self._pipeline.set_state(Gst.State.NULL)
         self._pipeline.set_property("uri", uri)
         self._pipeline.set_state(Gst.State.PLAYING)
@@ -43,19 +50,26 @@ class Player:
         self._emit_state("playing")
 
     def play(self):
+        logger.debug("Resuming playback")
         self._pipeline.set_state(Gst.State.PLAYING)
         self._start_timer()
         self._emit_state("playing")
 
     def pause(self):
+        logger.debug("Pausing playback")
         self._pipeline.set_state(Gst.State.PAUSED)
         self._stop_timer()
         self._emit_state("paused")
 
     def stop(self):
+        logger.debug("Stopping playback")
         self._pipeline.set_state(Gst.State.NULL)
         self._stop_timer()
         self._emit_state("stopped")
+
+    def set_loop_enabled(self, enabled: bool):
+        self._loop_enabled = enabled
+        logger.info("Track repeat %s", "enabled" if enabled else "disabled")
 
     def is_playing(self) -> bool:
         ok, state, _ = self._pipeline.get_state(Gst.CLOCK_TIME_NONE)
@@ -87,9 +101,14 @@ class Player:
     def _on_bus_message(self, bus, msg):
         if msg.type == Gst.MessageType.EOS:
             self._stop_timer()
-            self._emit_state("ended")
+            if self._loop_enabled and self._uri:
+                logger.debug("Track ended; restarting because repeat is enabled")
+                self.play_uri(self._uri)
+            else:
+                self._emit_state("ended")
         elif msg.type == Gst.MessageType.ERROR:
             err, _ = msg.parse_error()
+            logger.error("GStreamer playback error: %s", err)
             self._stop_timer()
             if self.on_error:
                 GLib.idle_add(self.on_error, str(err))

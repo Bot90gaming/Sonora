@@ -2,10 +2,13 @@
 Downloader — Python threading + GLib.idle_add (no PyQt6).
 """
 from __future__ import annotations
+import logging
 import threading
 from pathlib import Path
 import yt_dlp
 from gi.repository import GLib
+
+logger = logging.getLogger(__name__)
 
 
 class Downloader:
@@ -38,7 +41,7 @@ class Downloader:
 
     def _run(self, video_id, title, artist, out_dir: Path,
              audio_format, on_progress, on_done, on_error):
-        out_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Starting download (video_id=%s, format=%s)", video_id, audio_format)
         url = f"https://music.youtube.com/watch?v={video_id}"
 
         safe = lambda s: "".join(c for c in s if c.isalnum() or c in " _-").strip()
@@ -72,11 +75,14 @@ class Downloader:
         }
 
         try:
+            out_dir.mkdir(parents=True, exist_ok=True)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
             path = str(out_dir / f"{name}.{audio_format}")
+            logger.info("Download completed (video_id=%s, path=%s)", video_id, path)
             if on_done:
                 GLib.idle_add(on_done, path)
         except Exception as e:
+            logger.exception("Download failed (video_id=%s)", video_id)
             if on_error:
                 GLib.idle_add(on_error, str(e))

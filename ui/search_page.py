@@ -2,6 +2,7 @@
 Search page — GTK4 / Adwaita.
 """
 from __future__ import annotations
+import logging
 import threading
 import gi
 gi.require_version('Gtk', '4.0')
@@ -9,11 +10,14 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 from core.api import MusicAPI
+from ui.choice_dropdown import ChoiceDropDown
 from ui.widgets import make_track_list
 from ui.easter_egg import maybe_trigger
 
 
 FILTERS = ["songs", "albums", "artists", "playlists", "videos"]
+
+logger = logging.getLogger(__name__)
 
 
 class SearchPage(Gtk.Box):
@@ -52,8 +56,7 @@ class SearchPage(Gtk.Box):
         self._entry.connect("activate",       self._do_search)
         self._entry.connect("search-changed", self._on_search_changed)
 
-        self._filter = Gtk.DropDown.new_from_strings(FILTERS)
-        self._filter.set_selected(0)
+        self._filter = ChoiceDropDown([filter_.capitalize() for filter_ in FILTERS])
 
         btn_search = Gtk.Button(label="Search")
         btn_search.add_css_class("suggested-action")
@@ -162,6 +165,7 @@ class SearchPage(Gtk.Box):
                 tracks = self.api.get_playlist_tracks(playlist_id)
                 GLib.idle_add(self._on_playlist_loaded, tracks, name)
             except Exception as exc:
+                logger.exception("Could not load playlist tracks")
                 GLib.idle_add(self._show_error, str(exc))
 
         threading.Thread(target=_fetch, daemon=True).start()
@@ -261,6 +265,7 @@ class SearchPage(Gtk.Box):
                 GLib.idle_add(self._show_results, results)
                 GLib.idle_add(maybe_trigger, query, self.get_root())
             except Exception as exc:
+                logger.exception("Search failed (filter=%s)", filter_)
                 GLib.idle_add(self._show_error, str(exc))
 
         threading.Thread(target=_fetch, daemon=True).start()

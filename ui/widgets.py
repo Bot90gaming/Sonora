@@ -4,11 +4,32 @@ Shared GTK4 helper widgets and utilities.
 from __future__ import annotations
 import threading
 import requests
+from urllib.parse import quote
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Gtk, GdkPixbuf, GLib, Gio
+from gi.repository import Gtk, GdkPixbuf, GLib
+
+
+_THUMBNAIL_WIDTH = 72
+_THUMBNAIL_HEIGHT = 40
+
+
+def _crop_thumbnail(pix: GdkPixbuf.Pixbuf) -> GdkPixbuf.Pixbuf:
+    scale = max(
+        _THUMBNAIL_WIDTH / pix.get_width(),
+        _THUMBNAIL_HEIGHT / pix.get_height(),
+    )
+    scaled_width = round(pix.get_width() * scale)
+    scaled_height = round(pix.get_height() * scale)
+    scaled = pix.scale_simple(
+        scaled_width, scaled_height, GdkPixbuf.InterpType.BILINEAR)
+    if scaled is None:
+        raise ValueError("Unable to scale thumbnail")
+    x = (scaled_width - _THUMBNAIL_WIDTH) // 2
+    y = (scaled_height - _THUMBNAIL_HEIGHT) // 2
+    return scaled.new_subpixbuf(x, y, _THUMBNAIL_WIDTH, _THUMBNAIL_HEIGHT)
 
 
 def fmt_ms(ms: int) -> str:
@@ -23,6 +44,13 @@ def fmt_dur(s) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
+def thumbnail_url(song: dict) -> str:
+    video_id = song.get("videoId")
+    if video_id:
+        return f"https://i.ytimg.com/vi/{quote(str(video_id), safe='')}/mqdefault.jpg"
+    return song.get("thumbnail", "")
+
+
 def load_thumbnail_async(url: str, callback):
     """
     Fetch `url` in a daemon thread; call callback(pixbuf | None) on the
@@ -35,8 +63,7 @@ def load_thumbnail_async(url: str, callback):
             loader.write(data)
             loader.close()
             pix = loader.get_pixbuf()
-            pix = pix.scale_simple(56, 56, GdkPixbuf.InterpType.BILINEAR)
-            GLib.idle_add(callback, pix)
+            GLib.idle_add(callback, _crop_thumbnail(pix))
         except Exception:
             GLib.idle_add(callback, None)
 
@@ -59,7 +86,8 @@ def track_row(song: dict,
 
     # Thumbnail
     thumb = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
-    thumb.set_pixel_size(40)
+    thumb.set_pixel_size(24)
+    thumb.set_size_request(_THUMBNAIL_WIDTH, _THUMBNAIL_HEIGHT)
     thumb.add_css_class("track-thumb")
     box.append(thumb)
 
@@ -112,7 +140,7 @@ def track_row(song: dict,
         box.append(btn_dl)
 
     # Load thumbnail if available
-    url = song.get("thumbnail", "")
+    url = thumbnail_url(song)
     if url:
         def _set_thumb(pix):
             if pix:

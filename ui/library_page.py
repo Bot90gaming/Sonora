@@ -34,7 +34,6 @@ class LibraryPage(Gtk.Paned):
         self.on_play_all  = on_play_all
         self._current_songs: list[dict] = []
         self._current_name: str = ""
-        self._track_panel: Gtk.Widget | None = None
         self._build()
 
     # ── Construction ──────────────────────────────────────────────────────────

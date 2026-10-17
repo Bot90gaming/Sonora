@@ -1,5 +1,5 @@
 """
-Glassmorphism CSS theme for GTK4 / Adwaita dark.
+Theme CSS for GTK4 / Adwaita.
 Injects a custom CssProvider at application startup.
 Real blur-behind requires a compositor (GNOME Shell / KWin with blur plugin).
 On any compositor with alpha support, the frosted-glass palette still looks great.
@@ -21,6 +21,7 @@ _ACCENT         = "#a78bfa"          # violet-400
 _ACCENT_GLOW    = "rgba(167,139,250,0.35)"
 _TEXT_DIM       = "rgba(255,255,255,0.45)"
 _SHADOW         = "rgba(0, 0, 0, 0.55)"
+_PROGRESS_TROUGH = "__PROGRESS_TROUGH__"
 
 CSS = f"""
 /* ── Window / root ────────────────────────────────────────────────────────── */
@@ -28,6 +29,18 @@ window.background,
 .background {{
     background-color: {_BG_DARK};
     color: #e2e2f0;
+}}
+window label,
+window entry,
+window textview text,
+window dropdown,
+window dropdown row,
+window .title,
+window .subtitle {{
+    color: #e2e2f0;
+}}
+window label.dim-label {{
+    color: {_TEXT_DIM};
 }}
 
 /* ── Header bar ────────────────────────────────────────────────────────────── */
@@ -113,10 +126,44 @@ viewswitcher button:checked {{
 }}
 
 /* ── Player bar ─────────────────────────────────────────────────────────────── */
-.toolbar {{
-    background-color: rgba(12, 10, 22, 0.88);
-    border-top: 1px solid {_GLASS_BORDER};
-    box-shadow: 0 -4px 24px {_SHADOW};
+box.player-bar {{
+    background-color: {_GLASS_SURFACE};
+    border: 1px solid {_GLASS_BORDER};
+    border-radius: 20px;
+    box-shadow: 0 8px 28px {_SHADOW};
+    padding: 10px 14px;
+}}
+.player-art {{
+    background-color: {_GLASS_SURFACE2};
+    border: 1px solid {_GLASS_BORDER};
+    border-radius: 8px;
+}}
+.track-thumb {{
+    background-color: {_GLASS_SURFACE2};
+    border: 1px solid {_GLASS_BORDER};
+    border-radius: 8px;
+}}
+.player-controls {{
+    margin-bottom: 1px;
+}}
+button.player-transport {{
+    min-width: 34px;
+    min-height: 34px;
+    color: {_TEXT_DIM};
+}}
+button.player-play {{
+    min-width: 42px;
+    min-height: 42px;
+    padding: 0;
+}}
+.player-seek scale {{
+    min-width: 280px;
+}}
+.player-side-controls {{
+    border-radius: 999px;
+}}
+.player-side-controls image {{
+    color: {_TEXT_DIM};
 }}
 
 /* ── Buttons ─────────────────────────────────────────────────────────────────── */
@@ -141,6 +188,15 @@ button.circular.flat {{
 button.circular.flat:hover {{
     background-color: {_GLASS_SURFACE2};
 }}
+button.accent {{
+    color: {_ACCENT};
+}}
+switch:checked,
+checkbutton check:checked,
+radiobutton radio:checked {{
+    background-color: {_ACCENT};
+    border-color: {_ACCENT};
+}}
 
 /* ── Search entry ───────────────────────────────────────────────────────────── */
 entry,
@@ -161,15 +217,60 @@ searchentry:focus {{
     outline: none;
 }}
 
-/* ── Drop-down ───────────────────────────────────────────────────────────────── */
-dropdown > button {{
+/* ── Custom choice dropdown ─────────────────────────────────────────────────── */
+menubutton.choice-control > button {{
     background-color: {_GLASS_SURFACE};
     border: 1px solid {_GLASS_BORDER};
     border-radius: 10px;
+    color: #e2e2f0;
+    padding: 4px 0;
 }}
-dropdown > button:hover {{
+menubutton.choice-control > button:hover {{
     background-color: {_GLASS_SURFACE2};
     border-color: {_GLASS_BORDER2};
+}}
+popover.choice-popover {{
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}}
+popover.choice-popover > contents {{
+    background-color: {_GLASS_SURFACE};
+    border: 1px solid {_GLASS_BORDER};
+    border-radius: 14px;
+    box-shadow: 0 8px 24px {_SHADOW};
+    padding: 6px;
+}}
+.choice-options {{
+    background-color: transparent;
+}}
+button.choice-option {{
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    color: #e2e2f0;
+    padding: 8px 12px;
+}}
+button.choice-option:hover {{
+    background-color: {_GLASS_SURFACE2};
+}}
+button.choice-option.selected {{
+    background-color: rgba(167,139,250,0.18);
+    color: {_ACCENT};
+}}
+.login-dialog notebook,
+.login-dialog notebook > stack,
+.login-dialog notebook > stack > box,
+.login-dialog label,
+.login-dialog textview,
+.login-dialog textview text {{
+    background-color: transparent;
+}}
+.login-dialog textview,
+.login-dialog textview text {{
+    color: #e2e2f0;
 }}
 
 /* ── Scale / slider ─────────────────────────────────────────────────────────── */
@@ -205,7 +306,7 @@ scrollbar slider:hover {{
 
 /* ── Progress bar ────────────────────────────────────────────────────────────── */
 progressbar trough {{
-    background-color: rgba(255,255,255,0.10);
+    background-color: {_PROGRESS_TROUGH};
     border-radius: 999px;
     min-height: 5px;
 }}
@@ -244,6 +345,11 @@ popover > contents {{
 /* ── Status page ─────────────────────────────────────────────────────────────── */
 statuspage {{
     color: {_TEXT_DIM};
+    background-color: {_GLASS_SURFACE};
+    border: 1px solid {_GLASS_BORDER};
+    border-radius: 18px;
+    margin: 12px;
+    padding: 16px;
 }}
 """
 
@@ -257,6 +363,8 @@ _ACCENT_COLOURS = {
 }
 
 _provider: Gtk.CssProvider | None = None
+_style_manager = None
+_theme_options: dict | None = None
 
 
 def apply(app=None, theme: str = "dark",
@@ -267,21 +375,41 @@ def apply(app=None, theme: str = "dark",
     glass  : True = glass surfaces, False = solid surfaces
     accent : one of _ACCENT_COLOURS keys
     """
-    global _provider
+    global _provider, _style_manager, _theme_options
 
     from gi.repository import Adw
+    _theme_options = {
+        "app": app,
+        "theme": theme,
+        "glass": glass,
+        "accent": accent,
+    }
+    _style_manager = Adw.StyleManager.get_default()
+    if not getattr(apply, "_system_scheme_connected", False):
+        _style_manager.connect("notify::dark", _on_system_scheme_changed)
+        apply._system_scheme_connected = True
+
     scheme = {
         "dark":   Adw.ColorScheme.FORCE_DARK,
         "light":  Adw.ColorScheme.FORCE_LIGHT,
         "system": Adw.ColorScheme.DEFAULT,
     }.get(theme, Adw.ColorScheme.FORCE_DARK)
-    Adw.StyleManager.get_default().set_color_scheme(scheme)
+    _style_manager.set_color_scheme(scheme)
+    is_dark = theme == "dark" or (theme == "system" and _style_manager.get_dark())
 
     acc_hex, acc_glow = _ACCENT_COLOURS.get(accent, _ACCENT_COLOURS["violet"])
-    alpha = "0.06" if glass else "0.95"
-    surface_col = f"rgba(255,255,255,{alpha})" if glass else "rgba(30,28,48,0.95)"
+    surface_col = (
+        "rgba(255,255,255,0.06)" if is_dark else "rgba(35,25,55,0.035)"
+    ) if glass else (
+        "rgba(30,28,48,0.95)" if is_dark else "rgba(255,255,255,0.96)"
+    )
+    surface2_col = (
+        "rgba(255,255,255,0.10)" if is_dark else "rgba(35,25,55,0.07)"
+    ) if glass else (
+        "rgba(30,28,48,1.0)" if is_dark else "rgba(255,255,255,1.0)"
+    )
 
-    css = _build_css(acc_hex, acc_glow, surface_col, glass)
+    css = _build_css(acc_hex, acc_glow, surface_col, surface2_col, glass, is_dark)
 
     display = Gdk.Display.get_default()
     if _provider:
@@ -293,8 +421,82 @@ def apply(app=None, theme: str = "dark",
         display, _provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
 
-def _build_css(acc: str, glow: str, surface: str, glass: bool) -> str:
-    border_a = "0.14" if glass else "0.25"
-    return CSS.replace(_ACCENT, acc).replace(_ACCENT_GLOW, glow) \
-              .replace(_GLASS_SURFACE, surface) \
-              .replace("rgba(255, 255, 255, 0.14)", f"rgba(255,255,255,{border_a})")
+def _on_system_scheme_changed(*_):
+    if _theme_options and _theme_options["theme"] == "system":
+        apply(**_theme_options)
+
+
+def _rgba(hex_colour: str, alpha: float) -> str:
+    red = int(hex_colour[1:3], 16)
+    green = int(hex_colour[3:5], 16)
+    blue = int(hex_colour[5:7], 16)
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def _build_css(acc: str, glow: str, surface: str, surface2: str,
+               glass: bool, is_dark: bool) -> str:
+    border = (
+        "rgba(255,255,255,0.14)" if glass else "rgba(255,255,255,0.25)"
+    ) if is_dark else (
+        "rgba(40,32,60,0.16)" if glass else "rgba(40,32,60,0.25)"
+    )
+    border2 = (
+        "rgba(255,255,255,0.22)" if glass else "rgba(255,255,255,0.35)"
+    ) if is_dark else (
+        "rgba(40,32,60,0.26)" if glass else "rgba(40,32,60,0.35)"
+    )
+    text = "#e2e2f0" if is_dark else "#242033"
+    dim_text = "rgba(255,255,255,0.45)" if is_dark else "rgba(36,32,51,0.62)"
+    shadow = "rgba(0,0,0,0.55)" if is_dark else "rgba(35,25,55,0.16)"
+    root_bg = "rgba(10,10,18,0.92)" if is_dark else "rgba(247,246,251,0.98)"
+    header_bg = "rgba(20,18,36,0.75)" if is_dark else "rgba(255,255,255,0.88)"
+    sidebar_bg = "rgba(15,13,28,0.60)" if is_dark else "rgba(238,235,246,0.90)"
+    toolbar_bg = "rgba(12,10,22,0.88)" if is_dark else "rgba(255,255,255,0.92)"
+    popover_bg = "rgba(20,18,36,0.92)" if is_dark else "rgba(255,255,255,0.98)"
+    scale_trough = "rgba(255,255,255,0.12)" if is_dark else "rgba(35,25,55,0.14)"
+    scale_slider = "#ffffff" if is_dark else "#615b70"
+    scrollbar = "rgba(255,255,255,0.18)" if is_dark else "rgba(35,25,55,0.20)"
+    scrollbar_hover = "rgba(255,255,255,0.30)" if is_dark else "rgba(35,25,55,0.32)"
+    progress_trough = "rgba(255,255,255,0.10)" if is_dark else "rgba(35,25,55,0.10)"
+    nav_selection = _rgba(acc, 0.18)
+    nav_selection_border = _rgba(acc, 0.30)
+    row_selection = _rgba(acc, 0.15)
+    row_selection_border = _rgba(acc, 0.40)
+    button_bg = _rgba(acc, 0.80)
+    button_border = _rgba(acc, 0.60)
+    focus_ring = _rgba(acc, 0.20)
+
+    css = CSS
+    replacements = {
+        _BG_DARK: root_bg,
+        "#e2e2f0": text,
+        "rgba(20, 18, 36, 0.75)": header_bg,
+        "rgba(15, 13, 28, 0.60)": sidebar_bg,
+        "rgba(12, 10, 22, 0.88)": toolbar_bg,
+        "rgba(20, 18, 36, 0.92)": popover_bg,
+        _GLASS_SURFACE: surface,
+        _GLASS_SURFACE2: surface2,
+        _PROGRESS_TROUGH: progress_trough,
+        _GLASS_BORDER: border,
+        _GLASS_BORDER2: border2,
+        _TEXT_DIM: dim_text,
+        _SHADOW: shadow,
+        _ACCENT: acc,
+        _ACCENT_GLOW: glow,
+        "rgba(167,139,250,0.18)": nav_selection,
+        "rgba(167,139,250,0.30)": nav_selection_border,
+        "rgba(167,139,250,0.15)": row_selection,
+        "rgba(167,139,250,0.40)": row_selection_border,
+        "rgba(167,139,250,0.80)": button_bg,
+        "rgba(167,139,250,0.60)": button_border,
+        "rgba(167,139,250,1.0)": acc,
+        "rgba(167,139,250,0.20)": focus_ring,
+        "rgba(255,255,255,0.12)": scale_trough,
+        "#ffffff": scale_slider,
+        "rgba(255,255,255,0.18)": scrollbar,
+        "rgba(255,255,255,0.30)": scrollbar_hover,
+        "rgba(255,255,255,0.14)": border,
+    }
+    for old, new in replacements.items():
+        css = css.replace(old, new)
+    return css

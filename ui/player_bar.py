@@ -4,11 +4,10 @@ Bottom player bar — GTK4 / Adwaita.
 from __future__ import annotations
 import gi
 gi.require_version('Gtk', '4.0')
-gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Gtk, GLib, GdkPixbuf
+from gi.repository import Gtk
 
 from core.player import Player
-from ui.widgets import fmt_ms, load_thumbnail_async
+from ui.widgets import fmt_ms, load_thumbnail_async, thumbnail_url
 
 
 class PlayerBar(Gtk.Box):
@@ -29,8 +28,7 @@ class PlayerBar(Gtk.Box):
         self.on_prev: callable | None = None
         self.on_like: callable | None = None   # on_like(video_id, liked: bool)
 
-        self.add_css_class("toolbar")
-        self.set_margin_top(0)
+        self.add_css_class("player-bar")
 
         # Wire player callbacks
         self.player.on_position     = self._on_position
@@ -53,11 +51,13 @@ class PlayerBar(Gtk.Box):
         left.set_size_request(260, -1)
 
         self._thumb = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
-        self._thumb.set_pixel_size(56)
+        self._thumb.set_pixel_size(24)
+        self._thumb.set_size_request(72, 40)
         self._thumb.add_css_class("icon-dropshadow")
+        self._thumb.add_css_class("player-art")
         left.append(self._thumb)
 
-        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         info.set_valign(Gtk.Align.CENTER)
 
         self._lbl_title = Gtk.Label(label="Nothing playing")
@@ -86,11 +86,15 @@ class PlayerBar(Gtk.Box):
         # Transport buttons
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btns.set_halign(Gtk.Align.CENTER)
+        btns.add_css_class("player-controls")
 
         self._btn_prev = _icon_btn("media-skip-backward-symbolic",  "Previous")
         self._btn_play = _icon_btn("media-playback-start-symbolic", "Play / Pause")
         self._btn_next = _icon_btn("media-skip-forward-symbolic",   "Next")
 
+        self._btn_prev.add_css_class("player-transport")
+        self._btn_next.add_css_class("player-transport")
+        self._btn_play.add_css_class("player-play")
         self._btn_play.add_css_class("suggested-action")
         self._btn_play.add_css_class("circular")
 
@@ -106,6 +110,7 @@ class PlayerBar(Gtk.Box):
         # Seek row
         seek_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         seek_row.set_halign(Gtk.Align.CENTER)
+        seek_row.add_css_class("player-seek")
 
         self._lbl_pos = Gtk.Label(label="0:00")
         self._lbl_pos.add_css_class("caption")
@@ -131,6 +136,13 @@ class PlayerBar(Gtk.Box):
         seek_row.append(self._lbl_pos)
         seek_row.append(self._seek)
         seek_row.append(self._lbl_dur)
+        self._loop_btn = Gtk.ToggleButton()
+        self._loop_btn.set_icon_name("media-playlist-repeat-song-symbolic")
+        self._loop_btn.set_tooltip_text("Repeat current track")
+        self._loop_btn.add_css_class("flat")
+        self._loop_btn.add_css_class("circular")
+        self._loop_btn.connect("toggled", self._on_loop_toggled)
+        seek_row.append(self._loop_btn)
         centre.append(seek_row)
         self.append(centre)
 
@@ -139,6 +151,7 @@ class PlayerBar(Gtk.Box):
         right.set_size_request(220, -1)
         right.set_halign(Gtk.Align.END)
         right.set_valign(Gtk.Align.CENTER)
+        right.add_css_class("player-side-controls")
 
         # Like / heart button
         self._like_btn = Gtk.ToggleButton()
@@ -165,11 +178,20 @@ class PlayerBar(Gtk.Box):
 
     # ── Public ────────────────────────────────────────────────────────────────
 
+    def set_loading(self, loading: bool):
+        """Show/hide a spinner on the play button while audio is downloading."""
+        if loading:
+            self._btn_play.set_icon_name("content-loading-symbolic")
+            self._btn_play.set_sensitive(False)
+        else:
+            self._btn_play.set_icon_name("media-playback-start-symbolic")
+            self._btn_play.set_sensitive(True)
+
     def load_song(self, song: dict):
         self._lbl_title.set_label(song.get("title", "Unknown"))
         self._lbl_artist.set_label(song.get("artist", ""))
         self._thumb.set_from_icon_name("audio-x-generic-symbolic")
-        url = song.get("thumbnail", "")
+        url = thumbnail_url(song)
         if url:
             load_thumbnail_async(url, self._set_thumb)
 
@@ -197,6 +219,17 @@ class PlayerBar(Gtk.Box):
 
     def _on_volume(self, scale):
         self.player.set_volume(scale.get_value())
+
+    def _on_loop_toggled(self, button):
+        loop_enabled = button.get_active()
+        button.set_tooltip_text(
+            "Stop repeating current track" if loop_enabled
+            else "Repeat current track")
+        if loop_enabled:
+            button.add_css_class("accent")
+        else:
+            button.remove_css_class("accent")
+        self.player.set_loop_enabled(loop_enabled)
 
     def _on_position(self, pos_ms: int, dur_ms: int):
         self._lbl_pos.set_label(fmt_ms(pos_ms))

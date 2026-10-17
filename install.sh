@@ -8,7 +8,7 @@ DESKTOP_DIR="$HOME/.local/share/applications"
 echo "Installing Sonora..."
 
 # 1. Python dependencies
-pip install --user --quiet ytmusicapi yt-dlp requests
+pip install --quiet ytmusicapi yt-dlp requests --break-system-packages
 
 # 2. Copy app files
 mkdir -p "$APP_DIR"

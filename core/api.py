@@ -96,6 +96,48 @@ class MusicAPI:
         logger.debug("Search returned %d results", len(results))
         return results
 
+    def get_home(self, limit: int = 6) -> list[dict]:
+        """Get personalized home sections and normalize playable song entries."""
+        sections = self.yt.get_home(limit=limit) or []
+        if not isinstance(sections, list):
+            raise RuntimeError("YouTube Music returned an invalid home feed.")
+
+        normalized_sections = []
+        invalid_sections = 0
+        invalid_items = 0
+        for section in sections:
+            if not isinstance(section, dict):
+                invalid_sections += 1
+                continue
+
+            contents = []
+            section_contents = section.get("contents") or []
+            if not isinstance(section_contents, list):
+                invalid_items += 1
+                section_contents = []
+            for item in section_contents:
+                if not isinstance(item, dict):
+                    invalid_items += 1
+                    continue
+                result = self._parse_song(item) if item.get("videoId") else item
+                raw_thumbnails = item.get("thumbnails") or []
+                thumbnails = (
+                    [thumb for thumb in raw_thumbnails if isinstance(thumb, dict)]
+                    if isinstance(raw_thumbnails, list) else []
+                )
+                if not result.get("thumbnail") and thumbnails:
+                    result["thumbnail"] = thumbnails[-1].get("url", "")
+                contents.append(result)
+            normalized_sections.append({**section, "contents": contents})
+
+        if invalid_sections or invalid_items:
+            logger.warning(
+                "Ignored malformed YouTube Music home feed entries "
+                "(sections=%d, items=%d)",
+                invalid_sections, invalid_items,
+            )
+        return normalized_sections
+
     # ── Library ───────────────────────────────────────────────────────────────
 
     def get_liked_songs(self, limit: int = 100) -> list[dict]:
@@ -130,10 +172,16 @@ class MusicAPI:
 
     def _parse_song(self, item: dict) -> dict:
         artists = item.get("artists") or []
-        artist  = (", ".join(a.get("name", "") for a in artists)
-                   if isinstance(artists, list) else str(artists))
+        artist = (
+            ", ".join(a.get("name", "") for a in artists if isinstance(a, dict))
+            if isinstance(artists, list) else str(artists)
+        )
 
-        thumbs    = item.get("thumbnails") or []
+        raw_thumbnails = item.get("thumbnails") or []
+        thumbs = (
+            [thumb for thumb in raw_thumbnails if isinstance(thumb, dict)]
+            if isinstance(raw_thumbnails, list) else []
+        )
         thumbnail = thumbs[-1].get("url", "") if thumbs else ""
 
         album = item.get("album") or {}
@@ -149,9 +197,9 @@ class MusicAPI:
                 dur = 0
 
         # videoId can live at top-level or nested (e.g. album tracks use .videoId inside track)
-        video_id = (item.get("videoId")
-                    or (item.get("video") or {}).get("videoId", "")
-                    or "")
+        video = item.get("video")
+        video_id = item.get("videoId") or (
+            video.get("videoId", "") if isinstance(video, dict) else "")
 
         return {
             "videoId":   video_id,

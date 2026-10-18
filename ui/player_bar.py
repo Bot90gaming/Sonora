@@ -7,7 +7,7 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk
 
 from core.player import Player
-from ui.widgets import fmt_ms, load_thumbnail_async, thumbnail_url
+from ui.widgets import fmt_ms, load_picture_async, thumbnail_url
 
 
 class PlayerBar(Gtk.Box):
@@ -48,13 +48,25 @@ class PlayerBar(Gtk.Box):
 
         # ── Left: art + info ─────────────────────────────────────────────────
         left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        left.set_size_request(260, -1)
+        left.set_hexpand(True)
+        self._left = left
 
-        self._thumb = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
-        self._thumb.set_pixel_size(24)
+        self._thumb = Gtk.Overlay()
         self._thumb.set_size_request(72, 40)
-        self._thumb.add_css_class("icon-dropshadow")
-        self._thumb.add_css_class("player-art")
+        self._thumb_picture = Gtk.Picture()
+        self._thumb_picture.set_content_fit(Gtk.ContentFit.COVER)
+        self._thumb_picture.set_can_shrink(True)
+        self._thumb_picture.set_size_request(72, 40)
+        self._thumb_picture.add_css_class("player-art")
+        self._thumb.set_child(self._thumb_picture)
+
+        self._thumb_placeholder = Gtk.Image.new_from_icon_name(
+            "audio-x-generic-symbolic")
+        self._thumb_placeholder.set_pixel_size(24)
+        self._thumb_placeholder.set_halign(Gtk.Align.CENTER)
+        self._thumb_placeholder.set_valign(Gtk.Align.CENTER)
+        self._thumb_placeholder.add_css_class("player-art-placeholder")
+        self._thumb.add_overlay(self._thumb_placeholder)
         left.append(self._thumb)
 
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -109,7 +121,7 @@ class PlayerBar(Gtk.Box):
 
         # Seek row
         seek_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        seek_row.set_halign(Gtk.Align.CENTER)
+        seek_row.set_hexpand(True)
         seek_row.add_css_class("player-seek")
 
         self._lbl_pos = Gtk.Label(label="0:00")
@@ -119,9 +131,8 @@ class PlayerBar(Gtk.Box):
 
         self._seek = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
         self._seek.set_range(0, 1000)
-        self._seek.set_size_request(320, -1)
         self._seek.set_draw_value(False)
-        self._seek.set_hexpand(False)
+        self._seek.set_hexpand(True)
         # GTK4: use GestureDrag instead of button-press/release events
         drag = Gtk.GestureDrag()
         drag.connect("drag-begin",  lambda *_: setattr(self, "_dragging", True))
@@ -148,10 +159,11 @@ class PlayerBar(Gtk.Box):
 
         # ── Right: like + volume ──────────────────────────────────────────────
         right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        right.set_size_request(220, -1)
+        right.set_hexpand(True)
         right.set_halign(Gtk.Align.END)
         right.set_valign(Gtk.Align.CENTER)
         right.add_css_class("player-side-controls")
+        self._right = right
 
         # Like / heart button
         self._like_btn = Gtk.ToggleButton()
@@ -170,7 +182,7 @@ class PlayerBar(Gtk.Box):
         self._vol = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
         self._vol.set_range(0, 1)
         self._vol.set_value(0.8)
-        self._vol.set_size_request(100, -1)
+        self._vol.set_size_request(80, -1)
         self._vol.set_draw_value(False)
         self._vol.connect("value-changed", self._on_volume)
         right.append(self._vol)
@@ -190,13 +202,21 @@ class PlayerBar(Gtk.Box):
     def load_song(self, song: dict):
         self._lbl_title.set_label(song.get("title", "Unknown"))
         self._lbl_artist.set_label(song.get("artist", ""))
-        self._thumb.set_from_icon_name("audio-x-generic-symbolic")
+        self._current_vid = song.get("videoId", "")
+        self._thumb_picture.set_paintable(None)
+        self._thumb_placeholder.set_visible(True)
         url = thumbnail_url(song)
         if url:
-            load_thumbnail_async(url, self._set_thumb)
+            video_id = self._current_vid
 
+            def _set_thumb(texture):
+                if texture and self._current_vid == video_id:
+                    self._thumb_picture.set_paintable(texture)
+                    self._thumb_placeholder.set_visible(False)
+
+            load_picture_async(url, _set_thumb)
         # Reset like state for new song
-        self._current_vid = song.get("videoId", "")
+        # Reset like state for new song
         self._liked = False
         # Block signal to avoid triggering the callback while resetting
         self._like_btn.handler_block_by_func(self._on_like_toggled)
@@ -259,11 +279,6 @@ class PlayerBar(Gtk.Box):
 
     def _on_error(self, msg: str):
         self._lbl_title.set_label(f"Error: {msg}")
-
-    def _set_thumb(self, pix):
-        if pix:
-            self._thumb.set_from_pixbuf(pix)
-
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 

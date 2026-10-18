@@ -7,29 +7,9 @@ import requests
 from urllib.parse import quote
 
 import gi
+gi.require_version('Gdk', '4.0')
 gi.require_version('Gtk', '4.0')
-gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Gtk, GdkPixbuf, GLib
-
-
-_THUMBNAIL_WIDTH = 72
-_THUMBNAIL_HEIGHT = 40
-
-
-def _crop_thumbnail(pix: GdkPixbuf.Pixbuf) -> GdkPixbuf.Pixbuf:
-    scale = max(
-        _THUMBNAIL_WIDTH / pix.get_width(),
-        _THUMBNAIL_HEIGHT / pix.get_height(),
-    )
-    scaled_width = round(pix.get_width() * scale)
-    scaled_height = round(pix.get_height() * scale)
-    scaled = pix.scale_simple(
-        scaled_width, scaled_height, GdkPixbuf.InterpType.BILINEAR)
-    if scaled is None:
-        raise ValueError("Unable to scale thumbnail")
-    x = (scaled_width - _THUMBNAIL_WIDTH) // 2
-    y = (scaled_height - _THUMBNAIL_HEIGHT) // 2
-    return scaled.new_subpixbuf(x, y, _THUMBNAIL_WIDTH, _THUMBNAIL_HEIGHT)
+from gi.repository import Gtk, Gdk, GLib
 
 
 def fmt_ms(ms: int) -> str:
@@ -51,19 +31,15 @@ def thumbnail_url(song: dict) -> str:
     return song.get("thumbnail", "")
 
 
-def load_thumbnail_async(url: str, callback):
-    """
-    Fetch `url` in a daemon thread; call callback(pixbuf | None) on the
-    GLib main loop when done.
-    """
+def load_picture_async(url: str, callback):
+    """Fetch an image as a GDK texture and call back on the GTK main loop."""
     def _fetch():
         try:
-            data = requests.get(url, timeout=6).content
-            loader = GdkPixbuf.PixbufLoader()
-            loader.write(data)
-            loader.close()
-            pix = loader.get_pixbuf()
-            GLib.idle_add(callback, _crop_thumbnail(pix))
+            response = requests.get(url, timeout=6)
+            response.raise_for_status()
+            data = response.content
+            texture = Gdk.Texture.new_from_bytes(GLib.Bytes.new(data))
+            GLib.idle_add(callback, texture)
         except Exception:
             GLib.idle_add(callback, None)
 
@@ -85,10 +61,21 @@ def track_row(song: dict,
     box.song = song
 
     # Thumbnail
-    thumb = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
-    thumb.set_pixel_size(24)
-    thumb.set_size_request(_THUMBNAIL_WIDTH, _THUMBNAIL_HEIGHT)
-    thumb.add_css_class("track-thumb")
+    thumb = Gtk.Overlay()
+    thumb.set_size_request(72, 40)
+    picture = Gtk.Picture()
+    picture.set_content_fit(Gtk.ContentFit.COVER)
+    picture.set_can_shrink(True)
+    picture.set_size_request(72, 40)
+    picture.add_css_class("track-thumb")
+    thumb.set_child(picture)
+
+    placeholder = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
+    placeholder.set_pixel_size(24)
+    placeholder.set_halign(Gtk.Align.CENTER)
+    placeholder.set_valign(Gtk.Align.CENTER)
+    placeholder.add_css_class("track-thumb-placeholder")
+    thumb.add_overlay(placeholder)
     box.append(thumb)
 
     # Title + artist
@@ -142,10 +129,11 @@ def track_row(song: dict,
     # Load thumbnail if available
     url = thumbnail_url(song)
     if url:
-        def _set_thumb(pix):
-            if pix:
-                thumb.set_from_pixbuf(pix)
-        load_thumbnail_async(url, _set_thumb)
+        def _set_thumb(texture):
+            if texture:
+                picture.set_paintable(texture)
+                placeholder.set_visible(False)
+        load_picture_async(url, _set_thumb)
 
     return box
 

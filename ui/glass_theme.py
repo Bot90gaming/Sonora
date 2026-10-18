@@ -22,7 +22,7 @@ _ACCENT_GLOW    = "rgba(167,139,250,0.35)"
 _TEXT_DIM       = "rgba(255,255,255,0.45)"
 _SHADOW         = "rgba(0, 0, 0, 0.55)"
 _PROGRESS_TROUGH = "__PROGRESS_TROUGH__"
-_ACCOUNT_POPOVER_BG = "__ACCOUNT_POPOVER_BG__"
+_POPOVER_SURFACE = "__POPOVER_SURFACE__"
 
 CSS = f"""
 /* ── Window / root ────────────────────────────────────────────────────────── */
@@ -125,6 +125,40 @@ viewswitcher button:checked {{
     border-radius: 14px;
     box-shadow: 0 4px 20px {_SHADOW};
 }}
+.recommendation-card {{
+    min-width: 220px;
+    padding: 6px;
+    transition: background-color 120ms ease, border-color 120ms ease,
+                box-shadow 120ms ease;
+}}
+.recommendation-card:hover {{
+    background-color: {_GLASS_SURFACE2};
+    border-color: {_GLASS_BORDER2};
+    box-shadow: 0 6px 22px {_SHADOW};
+}}
+button.recommendation-card-main {{
+    background-color: transparent;
+    border: none;
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 0;
+}}
+button.recommendation-card-main:hover {{
+    background-color: transparent;
+}}
+.recommendation-art {{
+    background-color: {_GLASS_SURFACE2};
+    border-radius: 10px;
+}}
+.recommendation-art-placeholder {{
+    color: {_TEXT_DIM};
+}}
+.recommendation-play-overlay {{
+    color: #ffffff;
+    background-color: rgba(10,10,18,0.70);
+    border-radius: 999px;
+    padding: 10px;
+}}
 
 /* ── Player bar ─────────────────────────────────────────────────────────────── */
 box.player-bar {{
@@ -138,6 +172,10 @@ box.player-bar {{
     background-color: {_GLASS_SURFACE2};
     border: 1px solid {_GLASS_BORDER};
     border-radius: 8px;
+}}
+.player-art-placeholder,
+.track-thumb-placeholder {{
+    color: {_TEXT_DIM};
 }}
 .track-thumb {{
     background-color: {_GLASS_SURFACE2};
@@ -158,7 +196,7 @@ button.player-play {{
     padding: 0;
 }}
 .player-seek scale {{
-    min-width: 280px;
+    min-width: 0;
 }}
 .player-side-controls {{
     border-radius: 999px;
@@ -237,7 +275,7 @@ popover.choice-popover {{
     padding: 0;
 }}
 popover.choice-popover > contents {{
-    background-color: {_GLASS_SURFACE};
+    background-color: {_POPOVER_SURFACE};
     border: 1px solid {_GLASS_BORDER};
     border-radius: 14px;
     box-shadow: 0 8px 24px {_SHADOW};
@@ -337,20 +375,36 @@ separator {{
 
 /* ── Popover ─────────────────────────────────────────────────────────────────── */
 popover > contents {{
-    background-color: rgba(20, 18, 36, 0.92);
+    background-color: {_POPOVER_SURFACE};
     border: 1px solid {_GLASS_BORDER2};
     border-radius: 14px;
     box-shadow: 0 8px 32px {_SHADOW};
 }}
 
+popover.menu,
 popover.account-popover {{
     background-color: transparent;
     border: none;
     box-shadow: none;
     padding: 0;
 }}
+popover.menu > contents {{
+    background-color: {_POPOVER_SURFACE};
+    border: 1px solid {_GLASS_BORDER2};
+    border-radius: 14px;
+    box-shadow: 0 8px 32px {_SHADOW};
+    padding: 6px;
+}}
+popover.menu modelbutton {{
+    background-color: transparent;
+    border-radius: 8px;
+    color: #e2e2f0;
+}}
+popover.menu modelbutton:hover {{
+    background-color: {_GLASS_SURFACE2};
+}}
 popover.account-popover > contents {{
-    background-color: {_ACCOUNT_POPOVER_BG};
+    background-color: {_POPOVER_SURFACE};
     border: 1px solid {_GLASS_BORDER2};
     border-radius: 16px;
     box-shadow: 0 10px 30px {_SHADOW};
@@ -484,9 +538,8 @@ def _build_css(acc: str, glow: str, surface: str, surface2: str,
     header_bg = "rgba(20,18,36,0.75)" if is_dark else "rgba(255,255,255,0.88)"
     sidebar_bg = "rgba(15,13,28,0.60)" if is_dark else "rgba(238,235,246,0.90)"
     toolbar_bg = "rgba(12,10,22,0.88)" if is_dark else "rgba(255,255,255,0.92)"
-    popover_bg = "rgba(20,18,36,0.92)" if is_dark else "rgba(255,255,255,0.98)"
-    account_popover_bg = (
-        "rgba(20,18,36,0.72)" if is_dark else "rgba(255,255,255,0.76)"
+    popover_surface = (
+        "rgba(20,18,36,0.76)" if is_dark else "rgba(255,255,255,0.78)"
     ) if glass else (
         "rgba(30,28,48,0.98)" if is_dark else "rgba(255,255,255,0.98)"
     )
@@ -510,8 +563,7 @@ def _build_css(acc: str, glow: str, surface: str, surface2: str,
         "rgba(20, 18, 36, 0.75)": header_bg,
         "rgba(15, 13, 28, 0.60)": sidebar_bg,
         "rgba(12, 10, 22, 0.88)": toolbar_bg,
-        "rgba(20, 18, 36, 0.92)": popover_bg,
-        _ACCOUNT_POPOVER_BG: account_popover_bg,
+        _POPOVER_SURFACE: popover_surface,
         _GLASS_SURFACE: surface,
         _GLASS_SURFACE2: surface2,
         _PROGRESS_TROUGH: progress_trough,

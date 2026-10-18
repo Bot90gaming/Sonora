@@ -156,6 +156,7 @@ class SettingsPage(Adw.PreferencesPage):
             lambda index: cfg.set("audio_quality", _QUALITY_KEYS[index]),
             width=260,
         )
+        self._quality_dropdown = q_row._choice_dropdown
         group.add(q_row)
 
         autonext_row = Adw.SwitchRow()
@@ -221,8 +222,10 @@ class SettingsPage(Adw.PreferencesPage):
         row.set_title(title)
         row.set_subtitle(subtitle)
         row.set_icon_name(icon)
-        row.add_suffix(ChoiceDropDown(
-            choices, selected=selected, on_changed=on_changed, width=width))
+        dropdown = ChoiceDropDown(
+            choices, selected=selected, on_changed=on_changed, width=width)
+        row._choice_dropdown = dropdown
+        row.add_suffix(dropdown)
         return row
 
     def _pick_folder(self, *_):

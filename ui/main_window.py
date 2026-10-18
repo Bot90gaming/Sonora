@@ -16,6 +16,7 @@ from core.api      import MusicAPI
 from core.player   import Player
 from core          import settings as cfg
 from ui.player_bar    import PlayerBar
+from ui.for_you_page  import ForYouPage
 from ui.search_page   import SearchPage
 from ui.library_page  import LibraryPage
 from ui.download_page import DownloadPage
@@ -31,7 +32,7 @@ class MainWindow(Adw.ApplicationWindow):
     Top-level window:
         ┌─ HeaderBar (ViewSwitcher) ─────────────────────────────┐
         │                                                         │
-        │  ViewStack (Search | Library | Downloads)               │
+        │  ViewStack (For You | Search | Library | Downloads)      │
         │                                                         │
         ├─ PlayerBar ─────────────────────────────────────────────┤
         └─────────────────────────────────────────────────────────┘
@@ -80,7 +81,13 @@ class MainWindow(Adw.ApplicationWindow):
         # ── Pages ─────────────────────────────────────────────────────────────
         self._dl_page = DownloadPage()
 
-        # search + library get real api later via _init_api
+        self._for_you_page = ForYouPage(
+            api=_stub_api(),
+            on_play=self._play_song,
+            on_queue=self._enqueue,
+            on_download=self.download_song,
+            on_play_all=self._play_all,
+        )
         self._search_page = SearchPage(
             api=_stub_api(),
             on_play=self._play_song,
@@ -96,6 +103,9 @@ class MainWindow(Adw.ApplicationWindow):
             on_play_all=self._play_all,
         )
 
+        self._stack.add_titled_with_icon(
+            self._for_you_page, "for-you", "For You",
+            "starred-symbolic")
         self._stack.add_titled_with_icon(
             self._search_page, "search", "Search",
             "system-search-symbolic")
@@ -132,9 +142,79 @@ class MainWindow(Adw.ApplicationWindow):
         content_box.append(self._stack)
         content_box.append(self._player_bar)
 
+        if hasattr(Adw, "BreakpointBin"):
+            responsive = Adw.BreakpointBin()
+            responsive.set_child(toolbar_view)
+            responsive.set_size_request(320, 360)
+
+            def add_breakpoint(
+                max_width: int,
+                compact: bool = False,
+                library: bool = False,
+                narrow: bool = False,
+            ):
+                breakpoint = Adw.Breakpoint.new(
+                    Adw.BreakpointCondition.parse(
+                        f"max-width: {max_width}sp"))
+                breakpoint.add_setter(
+                    switcher, "policy", Adw.ViewSwitcherPolicy.NARROW)
+
+                if compact:
+                    breakpoint.add_setter(
+                        self._player_bar, "orientation",
+                        Gtk.Orientation.VERTICAL)
+                    breakpoint.add_setter(
+                        self._player_bar._left, "width-request", -1)
+                    breakpoint.add_setter(
+                        self._player_bar._right, "width-request", -1)
+                    breakpoint.add_setter(
+                        self._player_bar._seek, "width-request", 180)
+
+                if library:
+                    breakpoint.add_setter(
+                        self._lib_page, "orientation",
+                        Gtk.Orientation.VERTICAL)
+                    breakpoint.add_setter(
+                        self._lib_page._sidebar_box, "width-request", -1)
+                    breakpoint.add_setter(
+                        self._lib_page._sidebar_box, "height-request", 160)
+                    breakpoint.add_setter(
+                        self._lib_page, "resize-start-child", True)
+
+                if narrow:
+                    breakpoint.add_setter(
+                        self._search_page._bar, "orientation",
+                        Gtk.Orientation.VERTICAL)
+                    breakpoint.add_setter(
+                        self._dl_page._bar, "orientation",
+                        Gtk.Orientation.VERTICAL)
+                    breakpoint.add_setter(
+                        self._dl_page._dir_btn, "hexpand", True)
+                    breakpoint.add_setter(
+                        self._dl_page._toolbar_spacer, "visible", False)
+                    breakpoint.add_setter(
+                        self._player_bar._seek, "width-request", 120)
+                    breakpoint.add_setter(
+                        self._player_bar._vol, "width-request", 64)
+                    breakpoint.add_setter(
+                        self._settings_page._quality_dropdown,
+                        "width-request", 150)
+
+                responsive.add_breakpoint(breakpoint)
+
+            add_breakpoint(850)
+            add_breakpoint(700, compact=True)
+            add_breakpoint(620, compact=True, library=True)
+            add_breakpoint(
+                560, compact=True, library=True, narrow=True)
+            self._responsive = responsive
+        else:
+            responsive = None
+
         self._toast_overlay.set_child(content_box)
         toolbar_view.set_content(self._toast_overlay)
-        self.set_content(toolbar_view)
+        self.set_content(
+            responsive if responsive is not None else toolbar_view)
 
     def _build_acct_menu(self) -> Gtk.Popover:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -189,6 +269,7 @@ class MainWindow(Adw.ApplicationWindow):
             is_authenticated(),
         )
         self._api = api
+        self._for_you_page.set_api(api, authenticated=is_authenticated())
         self._search_page.api = api
         self._lib_page.api    = api
         if is_authenticated():
@@ -389,6 +470,7 @@ class MainWindow(Adw.ApplicationWindow):
 # ── Stub API (before real client is ready) ────────────────────────────────────
 
 class _stub_api:
+    def get_home(self, **kw): return []
     def search(self, *a, **kw): return []
     def get_liked_songs(self, **kw): return []
     def get_library_playlists(self): return []

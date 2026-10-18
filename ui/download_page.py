@@ -39,6 +39,7 @@ class DownloadPage(Gtk.Box):
     def _build(self):
         # Settings bar
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._bar = bar
         bar.set_margin_top(12)
         bar.set_margin_bottom(12)
         bar.set_margin_start(16)
@@ -47,7 +48,12 @@ class DownloadPage(Gtk.Box):
         dir_lbl = Gtk.Label(label="Save to:")
         dir_lbl.add_css_class("caption")
 
-        self._dir_btn = Gtk.Button(label=str(self._out_dir))
+        self._dir_label = Gtk.Label(label=str(self._out_dir), xalign=0)
+        self._dir_label.set_ellipsize(3)
+        self._dir_label.set_hexpand(True)
+        self._dir_btn = Gtk.Button()
+        self._dir_btn.set_child(self._dir_label)
+        self._dir_btn.set_hexpand(True)
         self._dir_btn.set_tooltip_text("Choose download folder")
         self._dir_btn.add_css_class("flat")
         self._dir_btn.connect("clicked", self._pick_dir)
@@ -73,6 +79,7 @@ class DownloadPage(Gtk.Box):
         # Make spacer expand
         spacer = open_btn.get_prev_sibling()
         spacer.set_hexpand(True)
+        self._toolbar_spacer = spacer
 
         self.append(bar)
         self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
@@ -141,7 +148,7 @@ class DownloadPage(Gtk.Box):
         try:
             f = dialog.select_folder_finish(result)
             self._out_dir = Path(f.get_path())
-            self._dir_btn.set_label(str(self._out_dir))
+            self._dir_label.set_label(str(self._out_dir))
         except Exception:
             pass
 

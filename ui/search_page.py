@@ -24,7 +24,7 @@ class SearchPage(Gtk.Box):
     """
     Full-page search view with a text entry, filter dropdown, and results list.
     on_play(song)  — called when the user activates a result.
-    on_queue(song) — called on right-click → Add to queue.
+    on_queue(song) — called by the inline Add to queue button.
     """
 
     def __init__(self, api: MusicAPI,
@@ -45,6 +45,7 @@ class SearchPage(Gtk.Box):
     def _build(self):
         # ── Top bar (static — never removed) ──────────────────────────────────
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._bar = bar
         bar.set_margin_top(12)
         bar.set_margin_bottom(12)
         bar.set_margin_start(16)
@@ -124,8 +125,7 @@ class SearchPage(Gtk.Box):
             sw = make_track_list(results,
                                  on_activate=self.on_play,
                                  on_queue=self.on_queue,
-                                 on_download=self.on_download,
-                                 on_menu=self._on_menu)
+                                 on_download=self.on_download)
             self._content.append(sw)
 
     def _show_playlist_results(self, playlists: list[dict]):
@@ -233,8 +233,7 @@ class SearchPage(Gtk.Box):
         sw = make_track_list(tracks,
                              on_activate=self.on_play,
                              on_queue=self.on_queue,
-                             on_download=self.on_download,
-                             on_menu=self._on_menu)
+                             on_download=self.on_download)
         self._content.append(sw)
 
     def _show_error(self, msg: str):
@@ -269,14 +268,3 @@ class SearchPage(Gtk.Box):
                 GLib.idle_add(self._show_error, str(exc))
 
         threading.Thread(target=_fetch, daemon=True).start()
-
-    def _on_menu(self, song: dict, x: float, y: float):
-        popover = Gtk.Popover()
-        menu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        btn = Gtk.Button(label="Add to queue")
-        btn.add_css_class("flat")
-        btn.connect("clicked", lambda *_: (self.on_queue(song), popover.popdown()))
-        menu.append(btn)
-        popover.set_child(menu)
-        popover.set_parent(self)
-        popover.popup()

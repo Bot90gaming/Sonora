@@ -32,7 +32,10 @@ class ChoiceDropDown(Gtk.MenuButton):
         control = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         control.set_margin_start(10)
         control.set_margin_end(10)
-        control.append(Gtk.Label(label=choices[selected], xalign=0))
+        selected_label = Gtk.Label(label=choices[selected], xalign=0)
+        selected_label.set_ellipsize(3)
+        selected_label.set_hexpand(True)
+        control.append(selected_label)
         control.append(Gtk.Image.new_from_icon_name("pan-down-symbolic"))
         self.set_child(control)
 

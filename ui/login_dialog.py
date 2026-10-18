@@ -44,10 +44,10 @@ class LoginDialog(Adw.Window):
         toolbar.add_top_bar(header)
 
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        content.set_margin_top(20)
-        content.set_margin_bottom(20)
-        content.set_margin_start(24)
-        content.set_margin_end(24)
+        content.set_margin_top(16)
+        content.set_margin_bottom(16)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
 
         # Intro label
         intro = Gtk.Label()
@@ -220,7 +220,11 @@ class LoginDialog(Adw.Window):
         btn_row.append(btn_cancel)
         content.append(btn_row)
 
-        toolbar.set_content(content)
+        content_scroll = Gtk.ScrolledWindow()
+        content_scroll.set_policy(
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        content_scroll.set_child(content)
+        toolbar.set_content(content_scroll)
         self.set_content(toolbar)
 
     # ── Callbacks ─────────────────────────────────────────────────────────────

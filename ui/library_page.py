@@ -18,7 +18,7 @@ class LibraryPage(Gtk.Paned):
     """
     Horizontal Paned: left sidebar + right track panel.
     on_play(song)  — called on track activation.
-    on_queue(song) — called on right-click → Add to queue.
+    on_queue(song) — called by the inline Add to queue button.
     """
 
     def __init__(self, api: MusicAPI,
@@ -41,7 +41,8 @@ class LibraryPage(Gtk.Paned):
     def _build(self):
         # ── Left sidebar ──────────────────────────────────────────────────────
         sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        sidebar_box.set_size_request(220, -1)
+        sidebar_box.set_size_request(180, -1)
+        self._sidebar_box = sidebar_box
 
         header_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         header_row.set_margin_top(12)
@@ -79,7 +80,7 @@ class LibraryPage(Gtk.Paned):
 
         self.set_start_child(sidebar_box)
         self.set_resize_start_child(False)
-        self.set_shrink_start_child(False)
+        self.set_shrink_start_child(True)
 
         # ── Right panel ───────────────────────────────────────────────────────
         self._right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -293,8 +294,7 @@ class LibraryPage(Gtk.Paned):
         sw = make_track_list(songs,
                              on_activate=self.on_play,
                              on_queue=self.on_queue,
-                             on_download=self.on_download,
-                             on_menu=self._on_menu)
+                             on_download=self.on_download)
         self._right.append(sw)
 
     def _show_error(self, msg: str):
@@ -312,14 +312,3 @@ class LibraryPage(Gtk.Paned):
             nxt = child.get_next_sibling()
             self._right.remove(child)
             child = nxt
-
-    def _on_menu(self, song: dict, x: float, y: float):
-        popover = Gtk.Popover()
-        menu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        btn = Gtk.Button(label="Add to queue")
-        btn.add_css_class("flat")
-        btn.connect("clicked", lambda *_: (self.on_queue(song), popover.popdown()))
-        menu.append(btn)
-        popover.set_child(menu)
-        popover.set_parent(self)
-        popover.popup()

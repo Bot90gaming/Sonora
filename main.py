@@ -27,7 +27,7 @@ def main():
         stream=sys.stderr,
     )
     logger.info("Starting Sonora%s", " with debug logging" if debug else "")
-    app = Adw.Application(application_id="io.github.ytmusic_player")
+    app = Adw.Application(application_id="io.github.sonora")
 
     # Force dark colour scheme to match our purple aesthetic
     app.connect("activate", _on_activate)

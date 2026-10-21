@@ -20,6 +20,9 @@ and download audio from a Linux desktop app.
 
 - Search songs, albums, artists, playlists, and videos
 - Play tracks through GStreamer and yt-dlp, with automatic retries
+- Start a station from the playing song, queue five similar tracks, and
+  pre-download them in the background
+- View and edit the playback queue by reordering or removing upcoming tracks
 - Browse liked songs, playlists, and albums after signing in
 - Like or unlike the current track
 - Download audio as MP3, M4A, Opus, FLAC, or WAV
@@ -69,7 +72,10 @@ chmod +x install.sh
 The installer places the app under `~/.local/share/sonora` and creates a
 launcher named `sonora` in `~/.local/bin`. If that command is not found, add
 `~/.local/bin` to your `PATH`, or launch Sonora from your desktop application
-menu.
+menu. It also installs the app icons into your local `hicolor` icon theme and
+registers a desktop entry so the icon appears in application menus and docks.
+If Sonora is already installed without its icon, run `./install.sh` again to
+install the desktop entry and icons.
 
 To uninstall, run `./uninstall.sh` from the cloned repository.
 

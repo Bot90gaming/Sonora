@@ -27,6 +27,8 @@ class PlayerBar(Gtk.Box):
         self.on_next: callable | None = None
         self.on_prev: callable | None = None
         self.on_like: callable | None = None   # on_like(video_id, liked: bool)
+        self.on_station: callable | None = None
+        self.on_queue: callable | None = None
 
         self.add_css_class("player-bar")
 
@@ -176,6 +178,18 @@ class PlayerBar(Gtk.Box):
         self._like_btn.connect("toggled", self._on_like_toggled)
         right.append(self._like_btn)
 
+        self._station_btn = _icon_btn(
+            "media-playlist-consecutive-symbolic", "Start station from this song")
+        self._station_btn.connect(
+            "clicked", lambda *_: self.on_station and self.on_station())
+        self._station_btn.set_sensitive(False)
+        right.append(self._station_btn)
+
+        self._queue_btn = _icon_btn("view-list-symbolic", "Playback queue")
+        self._queue_btn.connect(
+            "clicked", lambda *_: self.on_queue and self.on_queue())
+        right.append(self._queue_btn)
+
         vol_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
         right.append(vol_icon)
 
@@ -203,6 +217,9 @@ class PlayerBar(Gtk.Box):
         self._lbl_title.set_label(song.get("title", "Unknown"))
         self._lbl_artist.set_label(song.get("artist", ""))
         self._current_vid = song.get("videoId", "")
+        self._station_btn.set_sensitive(bool(self._current_vid))
+        self._station_btn.set_tooltip_text(
+            f"Start station from {song.get('title') or 'this song'}")
         self._thumb_picture.set_paintable(None)
         self._thumb_placeholder.set_visible(True)
         url = thumbnail_url(song)
@@ -224,6 +241,15 @@ class PlayerBar(Gtk.Box):
         self._like_btn.set_sensitive(bool(self._current_vid))
         self._like_btn.handler_unblock_by_func(self._on_like_toggled)
         self._update_like_style()
+
+    def set_station_loading(self, loading: bool):
+        self._station_btn.set_sensitive(not loading and bool(self._current_vid))
+        self._station_btn.set_icon_name(
+            "content-loading-symbolic" if loading
+            else "media-playlist-consecutive-symbolic")
+
+    def set_queue_count(self, count: int):
+        self._queue_btn.set_tooltip_text(f"Playback queue ({count} tracks)")
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
 

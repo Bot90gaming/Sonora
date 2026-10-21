@@ -3,6 +3,8 @@ Main application window — GTK4 / Adwaita.
 """
 from __future__ import annotations
 import logging
+import os
+import tempfile
 import threading
 import gi
 gi.require_version('Gtk', '4.0')
@@ -22,6 +24,7 @@ from ui.library_page  import LibraryPage
 from ui.download_page import DownloadPage
 from ui.login_dialog  import LoginDialog
 from ui.settings_page import SettingsPage
+from ui.queue_dialog import QueueDialog
 from ui.glass_theme   import apply as apply_glass
 
 logger = logging.getLogger(__name__)
@@ -36,8 +39,8 @@ class MainWindow(Adw.ApplicationWindow):
         │                                                         │
         ├─ PlayerBar ─────────────────────────────────────────────┤
         └─────────────────────────────────────────────────────────┘
-    Playback queue is a simple list[dict]; StreamFetcher resolves
-    YouTube audio URLs in a daemon thread.
+    Playback queue is a list of song dictionaries; yt-dlp downloads current
+    and station tracks on daemon threads.
     """
 
     def __init__(self, **kwargs):
@@ -49,6 +52,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._queue:  list[dict] = []
         self._q_idx:  int        = 0
         self._api:    MusicAPI | None = None
+        self._station_request_id = 0
+        self._station_cache_dir = os.path.join(
+            tempfile.gettempdir(), "sonora_station_cache")
+        self._audio_download_locks = {}
+        self._audio_download_locks_guard = threading.Lock()
+        self._queue_dialog: QueueDialog | None = None
 
         self._toast_overlay = Adw.ToastOverlay()
         self._build()
@@ -136,6 +145,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._player_bar.on_next = self._next_track
         self._player_bar.on_prev = self._prev_track
         self._player_bar.on_like = self._on_like_song
+        self._player_bar.on_station = self._start_station
+        self._player_bar.on_queue = self._show_queue
 
         # Assemble
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -287,10 +298,14 @@ class MainWindow(Adw.ApplicationWindow):
         """Play a single song immediately (replaces queue)."""
         self._queue = [song]
         self._q_idx = 0
+        self._update_queue_ui()
         self._start_playing(song)
 
     def _enqueue(self, song: dict):
+        if not self._queue:
+            self._q_idx = -1
         self._queue.append(song)
+        self._update_queue_ui()
         self._toast("Added to queue")
 
     def _play_all(self, songs: list[dict]):
@@ -301,11 +316,15 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._queue = playable
         self._q_idx = 0
+        self._update_queue_ui()
         self._start_playing(playable[0])
         self._toast(f"Playing {len(playable)} tracks")
 
     def _start_playing(self, song: dict):
+        self._station_request_id += 1
+        self._player_bar.set_station_loading(False)
         self._player_bar.load_song(song)
+        self._update_queue_ui()
         vid = song.get("videoId", "")
         if not vid:
             self._toast("No video ID — cannot play")
@@ -322,49 +341,17 @@ class MainWindow(Adw.ApplicationWindow):
         This avoids mid-stream TLS drops that happen when GStreamer
         tries to play YouTube CDN URLs directly.
         """
-        import tempfile, os, time, glob
-        url = f"https://music.youtube.com/watch?v={video_id}"
-        tmp_dir  = tempfile.gettempdir()
-        tmp_path = os.path.join(tmp_dir, f"sonora_{video_id}.%(ext)s")
-
-        ydl_opts = {
-            # webm/opus is supported by gst-plugins-good (always installed).
-            # m4a/AAC needs gst-libav or gst-plugins-bad — prefer webm to avoid
-            # the "gst-stream-error-quark: Internal data stream error" crash.
-            "format":      "bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio[ext=m4a]/bestaudio/best",
-            "quiet":       True,
-            "no_warnings": True,
-            "nocache":     True,
-            "outtmpl":     tmp_path,
-            "http_headers": {
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/125.0.0.0 Safari/537.36"
-                ),
-            },
-        }
+        import time
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info     = ydl.extract_info(url, download=True)
-                ext      = info.get("ext", "webm")
-                out_file = os.path.join(tmp_dir, f"sonora_{video_id}.{ext}")
-                # yt-dlp may pick a different ext than what the template used;
-                # scan for the actual file if the expected path doesn't exist.
-                if not os.path.exists(out_file):
-                    for candidate in glob.glob(
-                            os.path.join(tmp_dir, f"sonora_{video_id}.*")):
-                        out_file = candidate
-                        break
+            out_file = self._download_audio_file(
+                video_id, self._station_cache_dir)
 
-            logger.debug("Audio prepared for playback (video_id=%s, format=%s)",
-                         video_id, ext)
-            file_uri = f"file://{out_file}"
+            logger.debug("Audio prepared for playback (video_id=%s)", video_id)
+            from pathlib import Path
+            file_uri = Path(out_file).resolve().as_uri()
             GLib.idle_add(self._player_bar.set_loading, False)
             GLib.idle_add(self._player.play_uri, file_uri)
-
-            # Clean up older temp files (keep only last 5) to save disk space
-            self._cleanup_temp_files(tmp_dir, video_id)
+            GLib.idle_add(self._cleanup_station_cache)
 
         except Exception as exc:
             msg = str(exc)
@@ -379,20 +366,185 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._player_bar.set_loading, False)
                 GLib.idle_add(self._toast, f"Playback error: {exc}")
 
-    def _cleanup_temp_files(self, tmp_dir: str, current_id: str):
-        """Remove old sonora_* temp files, keeping only the current one."""
-        import os, glob
-        files = sorted(glob.glob(os.path.join(tmp_dir, "sonora_*.m4a")) +
-                       glob.glob(os.path.join(tmp_dir, "sonora_*.webm")) +
-                       glob.glob(os.path.join(tmp_dir, "sonora_*.opus")) +
-                       glob.glob(os.path.join(tmp_dir, "sonora_*.ogg")),
-                       key=os.path.getmtime)
-        for f in files:
-            if current_id not in f and len(files) > 5:
-                try:
-                    os.remove(f)
-                except OSError:
-                    pass
+    def _download_audio_file(self, video_id: str, directory: str) -> str:
+        import os
+
+        lock_key = (directory, video_id)
+        with self._audio_download_locks_guard:
+            download_lock = self._audio_download_locks.setdefault(
+                lock_key, threading.Lock())
+        with download_lock:
+            out_file = self._find_audio_file(directory, video_id)
+            if out_file:
+                return out_file
+
+            os.makedirs(directory, exist_ok=True)
+            url = f"https://music.youtube.com/watch?v={video_id}"
+            ydl_opts = {
+                "format": (
+                    "bestaudio[ext=webm]/bestaudio[ext=opus]/"
+                    "bestaudio[ext=m4a]/bestaudio/best"),
+                "quiet": True,
+                "no_warnings": True,
+                "nocache": True,
+                "outtmpl": os.path.join(directory, f"sonora_{video_id}.%(ext)s"),
+                "http_headers": {
+                    "User-Agent": (
+                        "Mozilla/5.0 (X11; Linux x86_64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/125.0.0.0 Safari/537.36"
+                    ),
+                },
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(url, download=True)
+            out_file = self._find_audio_file(directory, video_id)
+            if not out_file:
+                raise RuntimeError(
+                    "yt-dlp completed without producing an audio file")
+            return out_file
+
+    @staticmethod
+    def _find_audio_file(directory: str, video_id: str) -> str | None:
+        import glob
+        import os
+
+        candidates = glob.glob(os.path.join(directory, f"sonora_{video_id}.*"))
+        return next((path for path in candidates
+                     if os.path.isfile(path)
+                     and not path.endswith((".part", ".ytdl"))), None)
+
+    def _start_station(self):
+        api = self._api
+        if not api:
+            self._toast("YouTube Music is still connecting")
+            return
+        if (not self._queue or self._q_idx < 0
+                or self._q_idx >= len(self._queue)):
+            self._toast("Play a song before starting a station")
+            return
+
+        source = self._queue[self._q_idx]
+        video_id = source.get("videoId", "")
+        if not video_id:
+            self._toast("This track cannot start a station")
+            return
+
+        self._station_request_id += 1
+        request_id = self._station_request_id
+        self._player_bar.set_station_loading(True)
+
+        def fetch_station():
+            try:
+                songs = api.get_station(video_id, limit=5)
+                GLib.idle_add(
+                    self._apply_station, request_id, video_id, source, songs)
+            except Exception as exc:
+                logger.exception("Could not create station (video_id=%s)", video_id)
+                GLib.idle_add(
+                    self._station_failed, request_id, str(exc))
+
+        threading.Thread(target=fetch_station, daemon=True).start()
+
+    def _apply_station(self, request_id, video_id, source, songs):
+        if request_id != self._station_request_id:
+            return
+        if (not self._queue or self._q_idx < 0
+                or self._q_idx >= len(self._queue)
+                or self._queue[self._q_idx].get("videoId") != video_id):
+            self._player_bar.set_station_loading(False)
+            return
+        self._player_bar.set_station_loading(False)
+        if not songs:
+            self._toast("No station tracks were found for this song")
+            return
+
+        self._queue = [source, *songs]
+        self._q_idx = 0
+        self._update_queue_ui()
+        self._toast(f"Station added: {len(songs)} tracks downloading in background")
+        threading.Thread(
+            target=self._prefetch_station_tracks,
+            args=(request_id, songs), daemon=True).start()
+
+    def _station_failed(self, request_id, message):
+        if request_id == self._station_request_id:
+            self._player_bar.set_station_loading(False)
+            self._toast(f"Could not start station: {message}")
+
+    def _prefetch_station_tracks(self, request_id, songs):
+        failures = 0
+        for song in songs:
+            if request_id != self._station_request_id:
+                break
+            video_id = song.get("videoId", "")
+            if not video_id:
+                continue
+            try:
+                self._download_audio_file(video_id, self._station_cache_dir)
+            except Exception:
+                failures += 1
+                logger.exception(
+                    "Could not pre-download station track (video_id=%s)",
+                    video_id)
+        if failures:
+            GLib.idle_add(
+                self._toast, f"Could not pre-download {failures} station tracks")
+        GLib.idle_add(self._cleanup_station_cache)
+
+    def _cleanup_station_cache(self):
+        if not self._station_cache_dir:
+            return
+        import os
+
+        pending_songs = (
+            self._queue[self._q_idx:] if self._q_idx >= 0 else self._queue)
+        queued_ids = {
+            song.get("videoId")
+            for song in pending_songs if song.get("videoId")
+        }
+        try:
+            for name in os.listdir(self._station_cache_dir):
+                if (name.startswith("sonora_")
+                        and not any(name.startswith(f"sonora_{video_id}.")
+                                    for video_id in queued_ids)):
+                    os.remove(os.path.join(self._station_cache_dir, name))
+        except OSError:
+            logger.exception("Could not clean the station audio cache")
+
+    def _show_queue(self):
+        dialog = QueueDialog(
+            self, self._queue, self._q_idx, self._move_queue_item,
+            self._remove_queue_item, self._clear_upcoming)
+        dialog.connect("close-request", self._on_queue_dialog_close)
+        self._queue_dialog = dialog
+        dialog.present()
+
+    def _on_queue_dialog_close(self, *_):
+        self._queue_dialog = None
+        return False
+
+    def _move_queue_item(self, index: int, offset: int):
+        target = index + offset
+        if (self._q_idx < index < len(self._queue)
+                and self._q_idx < target < len(self._queue)):
+            self._queue[index], self._queue[target] = (
+                self._queue[target], self._queue[index])
+            self._update_queue_ui()
+
+    def _remove_queue_item(self, index: int):
+        if self._q_idx < index < len(self._queue):
+            self._queue.pop(index)
+            self._update_queue_ui()
+
+    def _clear_upcoming(self):
+        self._queue = self._queue[:self._q_idx + 1]
+        self._update_queue_ui()
+
+    def _update_queue_ui(self):
+        self._player_bar.set_queue_count(len(self._queue))
+        if self._queue_dialog:
+            self._queue_dialog.refresh(self._queue, self._q_idx)
 
     def _next_track(self):
         if self._q_idx + 1 < len(self._queue):

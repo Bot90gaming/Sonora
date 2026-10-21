@@ -204,6 +204,12 @@ button.player-play {{
 .player-side-controls image {{
     color: {_TEXT_DIM};
 }}
+.queue-row {{
+    background-color: {_GLASS_SURFACE};
+    border: 1px solid {_GLASS_BORDER};
+    border-radius: 10px;
+    padding: 6px;
+}}
 
 /* ── Buttons ─────────────────────────────────────────────────────────────────── */
 button.suggested-action {{

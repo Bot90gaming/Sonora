@@ -158,6 +158,33 @@ class MusicAPI:
         return [self._parse_song(t)
                 for t in self.yt.get_album(browse_id).get("tracks", [])]
 
+    def get_station(self, video_id: str, limit: int = 5) -> list[dict]:
+        """Return up to ``limit`` playable tracks from a YouTube Music radio mix."""
+        if not video_id or limit <= 0:
+            return []
+        result = self.yt.get_watch_playlist(
+            videoId=video_id, radio=True, limit=max(limit * 2, limit + 1))
+        tracks = result.get("tracks") if isinstance(result, dict) else None
+        if not isinstance(tracks, list):
+            logger.warning("YouTube Music returned an invalid station for video_id=%s",
+                           video_id)
+            return []
+
+        songs = []
+        seen = {video_id}
+        for track in tracks:
+            if not isinstance(track, dict):
+                continue
+            song = self._parse_song(track)
+            track_id = song.get("videoId")
+            if not track_id or track_id in seen:
+                continue
+            seen.add(track_id)
+            songs.append(song)
+            if len(songs) >= limit:
+                break
+        return songs
+
     # ── Like / Rate ───────────────────────────────────────────────────────────
 
     def like_song(self, video_id: str) -> None:

@@ -10,7 +10,6 @@ _FILE = _DIR / "settings.json"
 
 _DEFAULTS: dict = {
     "theme":           "dark",      # "dark" | "light" | "system"
-    "glass_effect":    True,
     "accent":          "violet",    # "violet"|"blue"|"green"|"rose"|"orange"
     "audio_quality":   "best",      # "best" | "medium" | "low"
     "autonext":        True,
@@ -26,7 +25,9 @@ def load() -> dict:
     if _cache is not None:
         return _cache
     try:
-        _cache = {**_DEFAULTS, **json.loads(_FILE.read_text())}
+        saved = json.loads(_FILE.read_text())
+        saved.pop("glass_effect", None)
+        _cache = {**_DEFAULTS, **saved}
     except Exception:
         _cache = dict(_DEFAULTS)
     return _cache

@@ -1,6 +1,4 @@
-"""
-Downloader — Python threading + GLib.idle_add (no PyQt6).
-"""
+"""yt-dlp downloader with progress callbacks dispatched through GLib."""
 from __future__ import annotations
 import logging
 import threading
@@ -14,8 +12,8 @@ logger = logging.getLogger(__name__)
 class Downloader:
     """
     Spawn one daemon thread per download.
-    All callbacks are scheduled on the GLib main loop so they are safe
-    to call directly from GTK widget handlers.
+    All callbacks are scheduled on the GLib main loop so they can be safely
+    forwarded to the Qt UI.
     """
 
     def download(

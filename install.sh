@@ -8,24 +8,25 @@ ICON_DIR="$HOME/.local/share/icons/hicolor"
 
 echo "Installing Sonora..."
 
-# 1. Python dependencies
-pip install --quiet ytmusicapi yt-dlp requests --break-system-packages
-
-# 2. Copy app files
+# 1. Copy app files
 mkdir -p "$APP_DIR"
 cp -r . "$APP_DIR"
+
+# 2. Install Python dependencies in an isolated environment
+python3 -m venv --system-site-packages "$APP_DIR/.venv"
+"$APP_DIR/.venv/bin/python" -m pip install --quiet -r "$APP_DIR/requirements.txt"
 
 # 3. Create launcher
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/sonora" <<LAUNCHER
 #!/usr/bin/env bash
-exec python3 "$APP_DIR/main.py" "\$@"
+exec "$APP_DIR/.venv/bin/python" "$APP_DIR/main.py" "\$@"
 LAUNCHER
 chmod +x "$BIN_DIR/sonora"
 
 # 4. Install desktop entry
 mkdir -p "$DESKTOP_DIR"
-sed "s|Exec=.*|Exec=python3 $APP_DIR/main.py|" \
+sed "s|Exec=.*|Exec=$APP_DIR/.venv/bin/python $APP_DIR/main.py|" \
     io.github.sonora.desktop \
     > "$DESKTOP_DIR/io.github.sonora.desktop"
 

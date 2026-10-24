@@ -1,3 +1,5 @@
 ytmusicapi
 yt-dlp
 requests
+PySide6
+QtPy

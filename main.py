@@ -1,22 +1,23 @@
-"""
-YTMusic Player — GTK4 + libadwaita entry point (Linux).
-"""
 import logging
+import os
 import sys
+from pathlib import Path
+
+os.environ["QT_API"] = "pyside6"
+os.environ.setdefault("QSG_RHI_BACKEND", "opengl")
 
 logger = logging.getLogger(__name__)
 
-import gi
-gi.require_version('Gtk', '4.0')
-gi.require_version('Adw', '1')
-gi.require_version('Gst', '1.0')
-from gi.repository import Adw, Gst
+from qtpy.QtGui import QGuiApplication
+from PySide6.QtCore import QUrl
+from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
+from PySide6.QtQml import QQmlApplicationEngine
 
-# Initialise GStreamer before anything else
-Gst.init(None)
+_bridge = None
 
 
 def main():
+    QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.OpenGL)
     debug = "--debug" in sys.argv[1:]
     if debug:
         sys.argv[:] = [arg for arg in sys.argv if arg != "--debug"]
@@ -27,31 +28,34 @@ def main():
         stream=sys.stderr,
     )
     logger.info("Starting Sonora%s", " with debug logging" if debug else "")
-    app = Adw.Application(application_id="io.github.sonora")
-
-    # Force dark colour scheme to match our purple aesthetic
-    app.connect("activate", _on_activate)
-
-    exit_code = app.run(sys.argv)
+    app = QGuiApplication(sys.argv)
+    app.setApplicationName("Sonora")
+    app.setOrganizationName("io.github")
+    app.setApplicationVersion("1.0.0")
+    engine = QQmlApplicationEngine()
+    _load_ui(engine)
+    if not engine.rootObjects():
+        logger.error("Could not load Sonora QML interface")
+        return 1
+    exit_code = app.exec()
     logger.info("Sonora exited with status %d", exit_code)
-    sys.exit(exit_code)
+    return exit_code
 
 
-def _on_activate(app: Adw.Application):
-    logger.debug("Activating application")
-    # Apply saved theme, surface style, and accent colour.
-    from core import settings as cfg
-    from ui.glass_theme import apply as apply_glass
-    apply_glass(
-        theme=cfg.get("theme"),
-        glass=cfg.get("glass_effect"),
-        accent=cfg.get("accent"),
-    )
+def _load_ui(engine: QQmlApplicationEngine):
+    global _bridge
 
-    from ui.main_window import MainWindow
-    win = MainWindow(application=app)
-    win.present()
+    import gi
+    gi.require_version("Gst", "1.0")
+    from gi.repository import Gst
+    from ui.qt_bridge import SonoraBridge
+
+    Gst.init(None)
+    _bridge = SonoraBridge()
+    engine.setInitialProperties({"bridge": _bridge})
+    qml_path = Path(__file__).parent / "ui" / "qml" / "Main.qml"
+    engine.load(QUrl.fromLocalFile(str(qml_path)))
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

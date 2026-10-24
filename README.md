@@ -1,15 +1,13 @@
 <div align="center">
 
-<img src="assets/preview.png" alt="Sonora" width="700"/>
-
 # Sonora
 
-**A native YouTube Music client for Linux, built with GTK 4 and libadwaita.**
+**A native YouTube Music client for Linux, built with PySide6 and Qt Quick.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)]()
-[![GTK](https://img.shields.io/badge/GTK-4.0-green.svg)]()
+[![Qt](https://img.shields.io/badge/Qt-Quick-green.svg)]()
 
 </div>
 
@@ -18,7 +16,7 @@ and download audio from a Linux desktop app.
 
 ## Features
 
-- Search songs, albums, artists, playlists, and videos
+- Search songs, albums, and playlists
 - Play tracks through GStreamer and yt-dlp, with automatic retries
 - Start a station from the playing song, queue five similar tracks, and
   pre-download them in the background
@@ -26,20 +24,23 @@ and download audio from a Linux desktop app.
 - Browse liked songs, playlists, and albums after signing in
 - Like or unlike the current track
 - Download audio as MP3, M4A, Opus, FLAC, or WAV
-- Choose dark, light, or system colour scheme, with glass effects and accent colours
+- Choose a solid dark, light, or system colour scheme with Material-inspired
+  surfaces and accent colours, in an animated Qt Quick interface
+
+The UI is built with PySide6, QtPy, and QML. Qt Quick provides the animated
+shell and component styling; it does not use browser Tailwind CSS.
 
 ## Installation
 
-Sonora requires Linux, Python 3.10 or later, GTK 4, libadwaita, GStreamer, and
-FFmpeg for audio downloads.
+Sonora requires Linux, Python 3.10 or later, PySide6, QtPy, PyGObject,
+GStreamer, and FFmpeg for audio downloads.
 
 ### Install system dependencies
 
 **Ubuntu / Debian**
 
 ```bash
-sudo apt install python3 python3-pip python3-gi python3-gi-cairo \
-  gir1.2-gtk-4.0 gir1.2-adw-1 \
+sudo apt install python3 python3-pip python3-venv python3-gi \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
   gstreamer1.0-plugins-bad gstreamer1.0-libav ffmpeg
 ```
@@ -47,7 +48,7 @@ sudo apt install python3 python3-pip python3-gi python3-gi-cairo \
 **Fedora / RHEL**
 
 ```bash
-sudo dnf install python3 python3-pip python3-gobject gtk4 libadwaita \
+sudo dnf install python3 python3-pip python3-gobject \
   gstreamer1-plugins-base gstreamer1-plugins-good \
   gstreamer1-plugins-bad-free gstreamer1-plugins-ugly \
   gstreamer1-libav ffmpeg
@@ -56,7 +57,7 @@ sudo dnf install python3 python3-pip python3-gobject gtk4 libadwaita \
 **Arch Linux**
 
 ```bash
-sudo pacman -S python python-pip python-gobject gtk4 libadwaita \
+sudo pacman -S python python-pip python-gobject \
   gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav ffmpeg
 ```
 
@@ -133,14 +134,16 @@ Music rejects requests, sign in again and save a fresh set of request headers.
 
 ## Run from source
 
-PyGObject (`gi`) and GTK are system dependencies, so a regular isolated virtual
-environment may not be able to import them. Install the system dependencies
-above first, then install the Python packages and launch the app:
+PyGObject (`gi`) and GStreamer are system dependencies. Install the system
+packages above first, then use a virtual environment that inherits those system
+packages:
 
 ```bash
 git clone https://github.com/Bot90gaming/Sonora.git
 cd Sonora
-python3 -m pip install --user -r requirements.txt
+python3 -m venv --system-site-packages venv
+source venv/bin/activate
+python3 -m pip install -r requirements.txt
 python3 main.py
 ```
 
@@ -150,19 +153,9 @@ For detailed diagnostic logs:
 python3 main.py --debug
 ```
 
-If you use a virtual environment, make it inherit the system packages so it can
-access PyGObject:
-
-```bash
-python3 -m venv --system-site-packages venv
-source venv/bin/activate
-python3 -m pip install -r requirements.txt
-python3 main.py
-```
-
 ## Troubleshooting
 
-- **`gi` or GTK import error:** install the GTK, libadwaita, and PyGObject
+- **`gi` or GStreamer import error:** install the PyGObject and GStreamer
   system packages for your Linux distribution.
 - **Playback or download fails:** check your network connection and install
   GStreamer plugins and FFmpeg. For more detail, start with `--debug` and check
@@ -195,19 +188,26 @@ sonora/
 │   ├── player.py
 │   └── settings.py
 ├── ui/
-│   ├── choice_dropdown.py
-│   ├── download_page.py
-│   ├── easter_egg.py
-│   ├── glass_theme.py
-│   ├── library_page.py
-│   ├── login_dialog.py
-│   ├── main_window.py
-│   ├── player_bar.py
-│   ├── search_page.py
-│   ├── settings_page.py
-│   └── widgets.py
+│   ├── qt_bridge.py
+│   ├── components/
+│   │   ├── FeaturedCarousel.qml
+│   │   ├── PlaylistGrid.qml
+│   │   ├── PlayerBar.qml
+│   │   ├── ShellButton.qml
+│   │   ├── ThemeScrollBar.qml
+│   │   ├── ThemeSlider.qml
+│   │   ├── ThemeToolButton.qml
+│   │   ├── TrackList.qml
+│   │   └── TrackThumbnail.qml
+│   └── qml/
+│       ├── Main.qml
+│       ├── config/
+│       │   └── ThemeConfig.qml
 └── assets/
 ```
+
+Reusable QML controls and layouts each have their own file in `ui/components/`;
+shared color tokens for dark, light, and accent themes live in `ui/qml/config/`.
 
 ## License
 

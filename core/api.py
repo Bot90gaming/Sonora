@@ -11,6 +11,10 @@ from ytmusicapi import YTMusic
 logger = logging.getLogger(__name__)
 
 
+class AuthenticationRequiredError(RuntimeError):
+    """Raised when YouTube Music returns its signed-out library placeholder."""
+
+
 class _HTMLTitleParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -141,8 +145,21 @@ class MusicAPI:
     # ── Library ───────────────────────────────────────────────────────────────
 
     def get_liked_songs(self, limit: int = 100) -> list[dict]:
-        return [self._parse_song(t)
-                for t in self.yt.get_liked_songs(limit=limit).get("tracks", [])]
+        try:
+            tracks = self.yt.get_liked_songs(limit=limit).get("tracks", [])
+        except KeyError as exc:
+            response = str(exc).casefold()
+            if (
+                "singlecolumnbrowseresultsrenderer" in response
+                and ("sign in" in response or "signinendpoint" in response)
+            ):
+                raise AuthenticationRequiredError(
+                    "YouTube Music returned a sign-in page instead of your "
+                    "Liked Songs. Your saved session may have expired. "
+                    "Sign in again in Settings → Account."
+                ) from None
+            raise
+        return [self._parse_song(track) for track in tracks]
 
     def get_library_playlists(self) -> list[dict]:
         return self.yt.get_library_playlists()

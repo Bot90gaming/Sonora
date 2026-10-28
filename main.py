@@ -5,6 +5,7 @@ from pathlib import Path
 
 os.environ["QT_API"] = "pyside6"
 os.environ.setdefault("QSG_RHI_BACKEND", "opengl")
+os.environ.setdefault("QSG_RENDER_LOOP", "threaded")
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,8 @@ _bridge = None
 
 def main():
     QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.OpenGL)
+    QQuickWindow.setDefaultAlphaBuffer(True)
+    QQuickWindow.setTextRenderType(QQuickWindow.NativeTextRendering)
     debug = "--debug" in sys.argv[1:]
     if debug:
         sys.argv[:] = [arg for arg in sys.argv if arg != "--debug"]
@@ -54,6 +57,7 @@ def _load_ui(engine: QQmlApplicationEngine):
     _bridge = SonoraBridge()
     engine.setInitialProperties({"bridge": _bridge})
     qml_path = Path(__file__).parent / "ui" / "qml" / "Main.qml"
+    logger.info("Loading Sonora UI: %s", qml_path)
     engine.load(QUrl.fromLocalFile(str(qml_path)))
 
 

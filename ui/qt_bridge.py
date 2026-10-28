@@ -1,10 +1,15 @@
 """Qt/QML bridge for Sonora's music, playback, and account services."""
 from __future__ import annotations
 
+import json
 import logging
+import re
+import sqlite3
 import tempfile
 import threading
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 import yt_dlp
@@ -87,6 +92,10 @@ class SonoraBridge(QObject):
     downloadProgressReceived = Signal(int, int)
     downloadDoneReceived = Signal(int, str)
     downloadErrorReceived = Signal(int, str)
+    uiSwitchRequested = Signal(str)
+    dynamicColorReceived = Signal(str)
+    lyricsChanged = Signal()
+    lyricsReceived = Signal(object)
 
     def __init__(self):
         super().__init__()
@@ -116,6 +125,9 @@ class SonoraBridge(QObject):
         self._volume = 0.8
         self._theme = cfg.get("theme") or "dark"
         self._accent = cfg.get("accent") or "violet"
+        self._dynamic_color = ""
+        self._lyrics = {"loading": False, "available": False, "hasTimestamps": False, "lines": [], "source": ""}
+        self._lyrics_token = 0
         self._gl_loop = None
         self._station_generation = 0
         self._cache_dir = Path(tempfile.gettempdir()) / "sonora_station_cache"
@@ -129,6 +141,8 @@ class SonoraBridge(QObject):
         self.downloadProgressReceived.connect(self._download_progress)
         self.downloadDoneReceived.connect(self._download_complete)
         self.downloadErrorReceived.connect(self._download_failed)
+        self.dynamicColorReceived.connect(self._set_dynamic_color)
+        self.lyricsReceived.connect(self._set_lyrics)
         self._player.on_position = self.positionReceived.emit
         self._player.on_state_change = self.stateReceived.emit
         self._player.on_error = self.playerErrorReceived.emit
@@ -225,6 +239,10 @@ class SonoraBridge(QObject):
     def nowPlaying(self):
         return self._now_playing
 
+    @Property("QVariantMap", notify=lyricsChanged)
+    def lyrics(self):
+        return self._lyrics
+
     @Property(bool, notify=playbackChanged)
     def playing(self):
         return self._playing
@@ -283,6 +301,10 @@ class SonoraBridge(QObject):
             "orange": "#ffb77d",
         }.get(self._accent, "#d0bcff")
 
+    @Property(str, notify=appearanceChanged)
+    def dynamicColor(self):
+        return self._dynamic_color or self.accentColor
+
     @Property(bool, notify=appearanceChanged)
     def darkTheme(self):
         return self._theme == "dark" or (
@@ -293,6 +315,342 @@ class SonoraBridge(QObject):
     def _system_is_dark():
         palette = QGuiApplication.palette()
         return palette.color(QPalette.ColorRole.Window).lightness() < 128
+
+    @Slot(str)
+    def _set_dynamic_color(self, hex_color):
+        if self._dynamic_color != hex_color:
+            self._dynamic_color = hex_color
+            self.appearanceChanged.emit()
+
+    def _extract_thumbnail_color(self, thumbnail_url):
+        if not thumbnail_url:
+            self.dynamicColorReceived.emit("")
+            return
+
+        def run():
+            try:
+                import urllib.request
+                from PySide6.QtGui import QImage
+                req = urllib.request.Request(
+                    thumbnail_url,
+                    headers={"User-Agent": "Mozilla/5.0"}
+                )
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = resp.read()
+                img = QImage()
+                if not img.loadFromData(data):
+                    return
+                small = img.scaled(24, 24)
+                best_color = None
+                best_score = -1.0
+                for y in range(small.height()):
+                    for x in range(small.width()):
+                        c = small.pixelColor(x, y)
+                        _, s, v, _ = c.getHsvF()
+                        if s < 0.22 or v < 0.22 or (v > 0.92 and s < 0.15):
+                            continue
+                        score = s * 1.5 + (1.0 - abs(v - 0.65))
+                        if score > best_score:
+                            best_score = score
+                            best_color = c
+                if best_color:
+                    self.dynamicColorReceived.emit(best_color.name())
+            except Exception as e:
+                logger.debug("Could not extract thumbnail color: %s", e)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    @Slot(object)
+    def _set_lyrics(self, lyrics_data):
+        self._lyrics = lyrics_data or {"loading": False, "available": False, "hasTimestamps": False, "lines": [], "source": ""}
+        self.lyricsChanged.emit()
+
+    @staticmethod
+    def _clean_title(title: str) -> str:
+        if not title:
+            return ""
+        cleaned = re.sub(
+            r"[\(\[](?:official|music\s+video|official\s+video|video|audio|lyric|lyrics|visualizer|remastered|live|deluxe|explicit|hd|4k|mv|remix|prod\.).*?[\)\]]",
+            "",
+            title,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(r"\s*(?:feat\.|ft\.).*", "", cleaned, flags=re.IGNORECASE)
+        return cleaned.strip(" -–—[]()| \t\n\r")
+
+    @staticmethod
+    def _clean_artist(artist: str) -> str:
+        if not artist:
+            return ""
+        artist = re.sub(r"\s*-\s*Topic$", "", artist, flags=re.IGNORECASE)
+        parts = re.split(r"[,&]|\bfeat\.?\b|\bft\.?\b", artist, flags=re.IGNORECASE)
+        return parts[0].strip()
+
+    @staticmethod
+    def _check_local_cache_lyrics(video_id: str) -> dict | None:
+        db_path = Path.home() / ".cache" / "sonora" / "cache.sqlite"
+        if not db_path.exists():
+            return None
+        try:
+            con = sqlite3.connect(str(db_path))
+            row = con.execute("SELECT value FROM lyrics WHERE key=?", (f"youtube:{video_id}:lyrics",)).fetchone()
+            if not row:
+                return None
+            val = json.loads(row[0])
+            hits = val.get("hits", [])
+            for h in hits:
+                syn = h.get("lyrics", {}).get("Synced")
+                if syn and isinstance(syn, dict) and syn.get("lines"):
+                    lines = []
+                    for idx, line in enumerate(syn["lines"]):
+                        st = line.get("start", {})
+                        et = line.get("end", {})
+                        st_ms = int(st.get("secs", 0) * 1000 + st.get("nanos", 0) / 1e6)
+                        et_ms = int(et.get("secs", 0) * 1000 + et.get("nanos", 0) / 1e6)
+                        lines.append({
+                            "id": idx,
+                            "text": line.get("text", "").strip(),
+                            "startTime": st_ms,
+                            "endTime": et_ms,
+                        })
+                    if lines:
+                        return {
+                            "loading": False,
+                            "available": True,
+                            "hasTimestamps": True,
+                            "lines": lines,
+                            "source": f"{h.get('source', 'Cache')} (Synced)",
+                        }
+        except Exception as e:
+            logger.debug("Cache lyrics read error: %s", e)
+        return None
+
+    @classmethod
+    def _fetch_lrclib(cls, title: str, artist: str = "", duration: int = 0) -> dict | None:
+        if not title:
+            return None
+        c_title = cls._clean_title(title)
+        c_artist = cls._clean_artist(artist)
+
+        # 1. Try GET with clean title & clean artist (no duration constraint)
+        params = {"track_name": c_title or title}
+        if c_artist:
+            params["artist_name"] = c_artist
+        url = "https://lrclib.net/api/get?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(url, headers={"User-Agent": "Sonora/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
+                data = json.loads(resp.read().decode())
+                if data and data.get("syncedLyrics"):
+                    parsed = cls._parse_lrc(data["syncedLyrics"])
+                    if len(parsed) > 2:
+                        return data
+                elif data and data.get("plainLyrics"):
+                    # keep as potential fallback
+                    pass
+        except Exception:
+            pass
+
+        # 2. Try SEARCH API with cleaned query
+        q = f"{c_title or title} {c_artist}".strip()
+        search_url = "https://lrclib.net/api/search?" + urllib.parse.urlencode({"q": q})
+        req = urllib.request.Request(search_url, headers={"User-Agent": "Sonora/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
+                results = json.loads(resp.read().decode())
+                if isinstance(results, list) and results:
+                    for item in results:
+                        if item.get("syncedLyrics"):
+                            parsed = cls._parse_lrc(item["syncedLyrics"])
+                            if len(parsed) > 2:
+                                return item
+                    return results[0]
+        except Exception:
+            pass
+
+        # 3. Fallback: try raw title search if different
+        if title != c_title:
+            raw_url = "https://lrclib.net/api/search?" + urllib.parse.urlencode({"q": title})
+            req = urllib.request.Request(raw_url, headers={"User-Agent": "Sonora/1.0"})
+            try:
+                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                    results = json.loads(resp.read().decode())
+                    if isinstance(results, list) and results:
+                        for item in results:
+                            if item.get("syncedLyrics"):
+                                parsed = cls._parse_lrc(item["syncedLyrics"])
+                                if len(parsed) > 2:
+                                    return item
+                        return results[0]
+            except Exception:
+                pass
+
+        return None
+
+    @staticmethod
+    def _parse_lrc(lrc_text: str) -> list[dict]:
+        pattern = re.compile(r'\[(\d+):(\d+(?:\.\d+)?)\](.*)')
+        raw = []
+        for line in lrc_text.splitlines():
+            m = pattern.match(line.strip())
+            if m:
+                mins = int(m.group(1))
+                secs = float(m.group(2))
+                start_ms = int((mins * 60 + secs) * 1000)
+                text = m.group(3).strip()
+                if text:
+                    raw.append((start_ms, text))
+        lines = []
+        for i, (start_ms, text) in enumerate(raw):
+            end_ms = raw[i + 1][0] if i + 1 < len(raw) else (start_ms + 4000)
+            lines.append({
+                "id": i,
+                "text": text,
+                "startTime": start_ms,
+                "endTime": end_ms
+            })
+        return lines
+
+    def _fetch_lyrics(self, video_id: str, title: str = "", artist: str = "", duration: int = 0):
+        self._lyrics_token += 1
+        token = self._lyrics_token
+
+        def run():
+            if token != self._lyrics_token:
+                return
+            try:
+                # 1. Check local cache first (instant and contains Apple Music & LrcLib synced lyrics)
+                cached = self._check_local_cache_lyrics(video_id)
+                if cached:
+                    if token != self._lyrics_token:
+                        return
+                    logger.info("Lyrics resolved from local cache for '%s'", title or video_id)
+                    self.lyricsReceived.emit(cached)
+                    return
+
+                # 2. Try YouTube Music if API is available
+                data = None
+                if self._api:
+                    try:
+                        data = self._api.get_song_lyrics(video_id)
+                    except Exception as e:
+                        logger.debug("YouTube lyrics error: %s", e)
+
+                if token != self._lyrics_token:
+                    return
+
+                has_yt_timestamps = bool(data and data.get("hasTimestamps"))
+                raw_lines = data.get("lyrics", []) if data else []
+
+                if has_yt_timestamps and isinstance(raw_lines, list) and len(raw_lines) > 0:
+                    lines = []
+                    for idx, line in enumerate(raw_lines):
+                        text = getattr(line, "text", "") if hasattr(line, "text") else (line.get("text", "") if isinstance(line, dict) else str(line))
+                        start_time = getattr(line, "start_time", 0) if hasattr(line, "start_time") else (line.get("start_time", 0) if isinstance(line, dict) else 0)
+                        end_time = getattr(line, "end_time", 0) if hasattr(line, "end_time") else (line.get("end_time", 0) if isinstance(line, dict) else 0)
+                        lines.append({
+                            "id": idx,
+                            "text": text,
+                            "startTime": start_time,
+                            "endTime": end_time
+                        })
+                    if token != self._lyrics_token:
+                        return
+                    logger.info("Lyrics resolved from YouTube Music (Synced) for '%s'", title or video_id)
+                    self.lyricsReceived.emit({
+                        "loading": False,
+                        "available": len(lines) > 0,
+                        "hasTimestamps": True,
+                        "lines": lines,
+                        "source": data.get("source", "YouTube Music")
+                    })
+                    return
+
+                # 3. Query LRCLIB for synced lyrics
+                lrclib_data = None
+                if title:
+                    lrclib_data = self._fetch_lrclib(title, artist, duration)
+                    if token != self._lyrics_token:
+                        return
+                    if lrclib_data and lrclib_data.get("syncedLyrics"):
+                        parsed_lines = self._parse_lrc(lrclib_data["syncedLyrics"])
+                        if parsed_lines and len(parsed_lines) > 2:
+                            if token != self._lyrics_token:
+                                return
+                            logger.info("Lyrics resolved from LRCLIB (Synced) for '%s'", title)
+                            self.lyricsReceived.emit({
+                                "loading": False,
+                                "available": True,
+                                "hasTimestamps": True,
+                                "lines": parsed_lines,
+                                "source": "LRCLIB (Synced)"
+                            })
+                            return
+
+                # 4. Fallback to plain text lyrics (from YouTube Music or LRCLIB)
+                plain_text = ""
+                source_label = ""
+                if isinstance(raw_lines, str) and raw_lines.strip():
+                    plain_text = raw_lines
+                    source_label = data.get("source", "YouTube Music") if data else ""
+                elif lrclib_data and lrclib_data.get("plainLyrics"):
+                    plain_text = lrclib_data["plainLyrics"]
+                    source_label = "LRCLIB"
+
+                if plain_text:
+                    raw_lines_list = [l.strip() for l in plain_text.splitlines() if l.strip()]
+                    if raw_lines_list:
+                        dur_ms = int(duration * 1000) if duration > 0 else 0
+                        has_timed = False
+                        lines = []
+                        if dur_ms > 15000 and len(raw_lines_list) > 1:
+                            has_timed = True
+                            intro_ms = min(12000, max(4000, int(dur_ms * 0.06)))
+                            singing_dur = dur_ms - intro_ms - int(dur_ms * 0.04)
+                            step_ms = singing_dur / len(raw_lines_list)
+                            for idx, text in enumerate(raw_lines_list):
+                                st = int(intro_ms + idx * step_ms)
+                                et = int(intro_ms + (idx + 1) * step_ms)
+                                lines.append({
+                                    "id": idx,
+                                    "text": text,
+                                    "startTime": st,
+                                    "endTime": et
+                                })
+                            source_label = f"{source_label or 'Lyrics'} (Auto-Paced)"
+                        else:
+                            for idx, text in enumerate(raw_lines_list):
+                                lines.append({
+                                    "id": idx,
+                                    "text": text,
+                                    "startTime": -1,
+                                    "endTime": -1
+                                })
+                        if token != self._lyrics_token:
+                            return
+                        logger.info("Lyrics resolved from %s for '%s' (timed=%s)", source_label, title, has_timed)
+                        self.lyricsReceived.emit({
+                            "loading": False,
+                            "available": True,
+                            "hasTimestamps": has_timed,
+                            "lines": lines,
+                            "source": source_label
+                        })
+                        return
+
+                # 5. No lyrics found
+                if token != self._lyrics_token:
+                    return
+                logger.info("No lyrics available for '%s' (%s)", title, video_id)
+                self.lyricsReceived.emit({"loading": False, "available": False, "hasTimestamps": False, "lines": [], "source": ""})
+            except Exception as e:
+                logger.debug("Failed fetching lyrics: %s", e)
+                if token == self._lyrics_token:
+                    self.lyricsReceived.emit({"loading": False, "available": False, "hasTimestamps": False, "lines": [], "source": ""})
+
+        threading.Thread(target=run, daemon=True).start()
+
+        threading.Thread(target=run, daemon=True).start()
 
     @Slot(str)
     def setPage(self, page):
@@ -359,7 +717,12 @@ class SonoraBridge(QObject):
                         })
             return items, collections
 
-        self._run(fetch, self._apply_home)
+        self._run(fetch, self._apply_home, self._on_home_error)
+
+    def _on_home_error(self, error):
+        self._set_busy(False)
+        logger.warning("Home feed failed to load: %s", error)
+        self.toast.emit("Could not refresh home feed. Check network or sign-in.")
 
     def _apply_home(self, result):
         items, collections = result
@@ -569,6 +932,9 @@ class SonoraBridge(QObject):
         self._queue.clear()
         self._queue_index = -1
         self._now_playing = {}
+        self._set_dynamic_color("")
+        self._lyrics = {"loading": False, "available": False, "hasTimestamps": False, "lines": [], "source": ""}
+        self.lyricsChanged.emit()
         self._player.stop()
         self.queueChanged.emit()
         self.nowPlayingChanged.emit()
@@ -587,6 +953,7 @@ class SonoraBridge(QObject):
         if not video_id:
             self.toast.emit("This track cannot be played")
             return
+        self._player.stop()
         self._station_generation += 1
         self._now_playing = dict(song)
         self._liked = False
@@ -594,6 +961,18 @@ class SonoraBridge(QObject):
         self._playing = False
         self._position = 0
         self._duration = 0
+        if song.get("thumbnail"):
+            self._extract_thumbnail_color(song["thumbnail"])
+        else:
+            self._set_dynamic_color("")
+        self._lyrics = {"loading": True, "available": False, "hasTimestamps": False, "lines": [], "source": ""}
+        self.lyricsChanged.emit()
+        self._fetch_lyrics(
+            video_id,
+            title=song.get("title", ""),
+            artist=song.get("artist", ""),
+            duration=song.get("duration", 0),
+        )
         self.nowPlayingChanged.emit()
         self.playbackChanged.emit()
         self.progressChanged.emit()
@@ -707,10 +1086,14 @@ class SonoraBridge(QObject):
     def _apply_player_state(self, state):
         self._playing = state == "playing"
         if state == "ended":
+            if self._loading:
+                return
             if self._loop:
                 self._start_song(self._now_playing)
             else:
                 self.nextTrack()
+        elif state in ("paused", "stopped"):
+            self._playing = False
         self.playbackChanged.emit()
 
     @Slot(int, int)
@@ -754,6 +1137,10 @@ class SonoraBridge(QObject):
     @Slot(str)
     def showToast(self, message):
         self.toast.emit(message)
+
+    @Slot(str)
+    def switchUi(self, target):
+        self.uiSwitchRequested.emit(target)
 
     @Slot("QVariantMap")
     def likeSong(self, song):
@@ -812,12 +1199,21 @@ class SonoraBridge(QObject):
                 self._set_busy(False)
                 self.toast.emit("No station tracks were found for this song")
                 return
+
+            is_currently_playing = (
+                self._playing
+                and self._now_playing.get("videoId") == song.get("videoId")
+            )
+
             self._queue = [dict(song), *songs]
             self._queue_index = 0
             self.queueChanged.emit()
             self._set_busy(False)
-            self.toast.emit(f"Station added: {len(songs)} tracks")
-            self._start_song(self._queue[0])
+            self.toast.emit(f"Station started: {len(songs)} tracks queued")
+
+            if not is_currently_playing:
+                self._start_song(self._queue[0])
+
             prefetch_generation = self._station_generation
 
             def prefetch():

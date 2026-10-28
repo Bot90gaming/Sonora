@@ -2,18 +2,30 @@ import QtQuick
 import QtQuick.Controls
 
 ScrollBar {
-    id: control
-    required property var themeColors
-
-    width: 8
-    contentItem: Rectangle {
-        implicitWidth: 6
-        radius: 3
-        color: control.pressed ? control.themeColors.accent
-            : control.hovered ? control.themeColors.muted
-            : control.themeColors.border
-        opacity: control.active ? 1 : 0.45
-        Behavior on color { ColorAnimation { duration: 140 } }
-        Behavior on opacity { NumberAnimation { duration: 140 } }
+    id: sb
+    property var themeColors: null
+    property Flickable target
+    orientation: Qt.Vertical
+    policy: ScrollBar.AsNeeded
+    anchors {
+        right: parent ? parent.right : undefined
+        top: parent ? parent.top : undefined
+        bottom: parent ? parent.bottom : undefined
     }
+
+    contentItem: Rectangle {
+        implicitWidth: sb.active ? 10 : 6
+        radius: implicitWidth / 2
+        color: sb.themeColors ? sb.themeColors.onSurfaceVariant : "#C4C6D0"
+        opacity: sb.active ? 0.65 : 0.0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+        }
+        Behavior on implicitWidth {
+            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+        }
+    }
+
+    background: Item {}
 }

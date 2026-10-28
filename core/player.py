@@ -43,6 +43,7 @@ class Player:
     def play_uri(self, uri: str):
         logger.debug("Starting playback")
         self._uri = uri
+        self._stop_timer()
         self._pipeline.set_state(Gst.State.NULL)
         self._pipeline.set_property("uri", uri)
         self._pipeline.set_state(Gst.State.PLAYING)
@@ -63,8 +64,8 @@ class Player:
 
     def stop(self):
         logger.debug("Stopping playback")
-        self._pipeline.set_state(Gst.State.NULL)
         self._stop_timer()
+        self._pipeline.set_state(Gst.State.NULL)
         self._emit_state("stopped")
 
     def set_loop_enabled(self, enabled: bool):
@@ -119,7 +120,7 @@ class Player:
 
     def _start_timer(self):
         self._stop_timer()
-        self._timer_id = GLib.timeout_add(500, self._poll_position)
+        self._timer_id = GLib.timeout_add(100, self._poll_position)
 
     def _stop_timer(self):
         if self._timer_id is not None:

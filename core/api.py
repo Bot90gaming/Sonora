@@ -73,12 +73,20 @@ class MusicAPI:
         try:
             raw = self.yt.search(query, filter=filter_, limit=limit)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                "YouTube Music returned an empty or invalid response. "
-                "Check the terminal log for HTTP status and response metadata. "
-                "HTTP 400 means the request was rejected; HTTP 401 or 403 may "
-                "mean the saved sign-in has expired."
-            ) from exc
+            logger.warning(
+                "YouTube Music returned invalid response for search with authenticated client (%s). "
+                "Attempting fallback to unauthenticated search...",
+                exc,
+            )
+            try:
+                raw = YTMusic().search(query, filter=filter_, limit=limit)
+            except Exception:
+                raise RuntimeError(
+                    "YouTube Music returned an empty or invalid response. "
+                    "Check the terminal log for HTTP status and response metadata. "
+                    "HTTP 400 means the request was rejected; HTTP 401 or 403 may "
+                    "mean the saved sign-in has expired."
+                ) from exc
         if filter_ == "songs":
             results = [self._parse_song(r) for r in raw]
         else:
@@ -102,7 +110,20 @@ class MusicAPI:
 
     def get_home(self, limit: int = 6) -> list[dict]:
         """Get personalized home sections and normalize playable song entries."""
-        sections = self.yt.get_home(limit=limit) or []
+        try:
+            sections = self.yt.get_home(limit=limit) or []
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "YouTube Music returned an invalid response (JSON decode error) for home feed: %s. "
+                "Attempting fallback to unauthenticated client...",
+                exc,
+            )
+            try:
+                sections = YTMusic().get_home(limit=limit) or []
+            except Exception as fallback_exc:
+                raise RuntimeError(
+                    "YouTube Music returned an invalid response and fallback failed."
+                ) from fallback_exc
         if not isinstance(sections, list):
             raise RuntimeError("YouTube Music returned an invalid home feed.")
 
@@ -211,6 +232,31 @@ class MusicAPI:
     def unlike_song(self, video_id: str) -> None:
         """Remove like (set to INDIFFERENT)."""
         self.yt.rate_song(video_id, "INDIFFERENT")
+
+    def get_song_lyrics(self, video_id: str) -> dict | None:
+        """Fetch lyrics (with timestamps if available) for a given video_id."""
+        if not video_id:
+            return None
+        try:
+            watch = self.yt.get_watch_playlist(videoId=video_id)
+            if not isinstance(watch, dict):
+                return None
+            browse_id = watch.get("lyrics")
+            if not browse_id:
+                return None
+            data = None
+            try:
+                data = self.yt.get_lyrics(browse_id, timestamps=True)
+            except Exception:
+                pass
+            if not data:
+                data = self.yt.get_lyrics(browse_id, timestamps=False)
+            if not data or not isinstance(data, dict):
+                return None
+            return data
+        except Exception as e:
+            logger.debug("Failed to retrieve lyrics for %s: %s", video_id, e)
+            return None
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

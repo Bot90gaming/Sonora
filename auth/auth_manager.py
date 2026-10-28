@@ -58,6 +58,46 @@ def is_google_oauth_configured() -> bool:
     return True
 
 
+def sanitize_headers_dict(headers: dict[str, str]) -> dict[str, str]:
+    """Sanitize parsed headers to ensure no corrupted or hop-by-hop headers are passed to YouTube."""
+    disallowed_headers = {
+        "host", "content-length", "accept-encoding", "content-encoding",
+        "connection", "te", "keep-alive", "proxy-connection",
+        "upgrade", "alt-used", "priority"
+    }
+    sanitized = {}
+    for k, v in headers.items():
+        k_clean = str(k).strip()
+        k_lower = k_clean.lower()
+        # Header names must be valid RFC tokens: no spaces, slashes, colons, question marks
+        if not k_clean or any(c in k_clean for c in " \t/:?&=#;"):
+            continue
+        if k_lower.startswith(":") or k_lower in disallowed_headers:
+            continue
+        if k_lower.startswith("sec-"):
+            continue
+        sanitized[k_clean] = str(v).strip() if isinstance(v, str) else v
+    return sanitized
+
+
+def sanitize_oauth_file(path: Path) -> bool:
+    """Read a stored headers json, remove corrupt/invalid keys, and rewrite if modified."""
+    try:
+        if not path.is_file():
+            return False
+        raw_text = path.read_text(encoding="utf-8")
+        data = json.loads(raw_text)
+        if not isinstance(data, dict):
+            return False
+        cleaned = sanitize_headers_dict(data)
+        if cleaned != data:
+            path.write_text(json.dumps(cleaned, indent=4, ensure_ascii=True), encoding="utf-8")
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def is_authenticated() -> bool:
     return any(
         path.exists() and path.stat().st_size > 10
@@ -76,6 +116,7 @@ def get_ytmusic_client() -> YTMusic:
 
     if is_authenticated():
         try:
+            sanitize_oauth_file(_TOKEN_FILE)
             return YTMusic(str(_TOKEN_FILE))
         except Exception:
             pass
@@ -85,7 +126,17 @@ def get_ytmusic_client() -> YTMusic:
 def setup_from_headers(headers_raw: str) -> str:
     _TOKEN_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(_TOKEN_DIR, 0o700)
-    _ytm.setup(filepath=str(_TOKEN_FILE), headers_raw=headers_raw)
+    cleaned_lines = []
+    for line in headers_raw.splitlines():
+        trimmed = line.strip()
+        if (trimmed.startswith(("GET ", "POST ", "PUT ", "DELETE ", "OPTIONS ", "HEAD ", "HTTP/"))
+                or trimmed.startswith(":")
+                or not trimmed):
+            continue
+        cleaned_lines.append(line)
+    cleaned_raw = "\n".join(cleaned_lines)
+    _ytm.setup(filepath=str(_TOKEN_FILE), headers_raw=cleaned_raw)
+    sanitize_oauth_file(_TOKEN_FILE)
     os.chmod(_TOKEN_FILE, 0o600)
     _GOOGLE_TOKEN_FILE.unlink(missing_ok=True)
     _GOOGLE_CREDENTIALS_FILE.unlink(missing_ok=True)

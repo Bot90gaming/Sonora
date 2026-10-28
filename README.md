@@ -17,6 +17,7 @@ and download audio from a Linux desktop app.
 ## Features
 
 - Search songs, albums, and playlists
+- Real-time synchronized lyrics with animated glowing highlight aura and continuous sub-pixel font swell (powered by LRCLIB and local cache)
 - Play tracks through GStreamer and yt-dlp, with automatic retries
 - Start a station from the playing song, queue five similar tracks, and
   pre-download them in the background
@@ -33,19 +34,23 @@ shell and component styling; it does not use browser Tailwind CSS.
 ## Installation
 
 Sonora requires Linux, Python 3.10 or later, PySide6, QtPy, PyGObject,
-GStreamer, and FFmpeg for audio downloads.
+GStreamer, and FFmpeg for audio playback and downloads.
 
 ### Install system dependencies
 
-**Ubuntu / Debian**
+Select your Linux distribution below to install the necessary GStreamer plugins, Python GObject bindings, and FFmpeg:
+
+**Ubuntu / Debian / Linux Mint / Pop!_OS**
 
 ```bash
+sudo apt update
 sudo apt install python3 python3-pip python3-venv python3-gi \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-bad gstreamer1.0-libav ffmpeg
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+  gstreamer1.0-libav ffmpeg
 ```
 
-**Fedora / RHEL**
+**Fedora / RHEL / AlmaLinux / Rocky Linux**
 
 ```bash
 sudo dnf install python3 python3-pip python3-gobject \
@@ -53,12 +58,39 @@ sudo dnf install python3 python3-pip python3-gobject \
   gstreamer1-plugins-bad-free gstreamer1-plugins-ugly \
   gstreamer1-libav ffmpeg
 ```
+*(Note: If you need MP3/AAC audio codec support on Fedora, ensure RPM Fusion is enabled for `gstreamer1-plugins-ugly` and `gstreamer1-libav`).*
 
-**Arch Linux**
+**Arch Linux / Manjaro / EndeavourOS**
 
 ```bash
-sudo pacman -S python python-pip python-gobject \
-  gst-plugins-base gst-plugins-good gst-plugins-bad gst-libav ffmpeg
+sudo pacman -Syu python python-pip python-gobject \
+  gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
+  gst-libav ffmpeg
+```
+
+**openSUSE (Tumbleweed / Leap)**
+
+```bash
+sudo zypper install python3 python3-pip python3-gobject \
+  gstreamer-plugins-base gstreamer-plugins-good \
+  gstreamer-plugins-bad gstreamer-plugins-ugly \
+  gstreamer-plugins-libav ffmpeg
+```
+
+**Void Linux**
+
+```bash
+sudo xbps-install -S python3 python3-pip python3-gobject \
+  gst-plugins-base1 gst-plugins-good1 gst-plugins-bad1 gst-plugins-ugly1 \
+  gst-libav ffmpeg
+```
+
+**Gentoo Linux**
+
+```bash
+sudo emerge --ask dev-python/pygobject media-libs/gst-plugins-base \
+  media-libs/gst-plugins-good media-libs/gst-plugins-bad \
+  media-plugins/gst-plugins-ugly media-video/ffmpeg
 ```
 
 ### Install Sonora
@@ -190,10 +222,19 @@ sonora/
 ├── ui/
 │   ├── qt_bridge.py
 │   ├── components/
+│   │   ├── EqualizerBars.qml
 │   │   ├── FeaturedCarousel.qml
+│   │   ├── FilterChip.qml
+│   │   ├── FullPlayerWindow.qml
+│   │   ├── LinearProgress.qml
+│   │   ├── LoadingIndicator.qml
+│   │   ├── MD3Icon.qml
+│   │   ├── NavRail.qml
 │   │   ├── PlaylistGrid.qml
 │   │   ├── PlayerBar.qml
 │   │   ├── ShellButton.qml
+│   │   ├── Snackbar.qml
+│   │   ├── StateLayer.qml
 │   │   ├── ThemeScrollBar.qml
 │   │   ├── ThemeSlider.qml
 │   │   ├── ThemeToolButton.qml
@@ -208,6 +249,8 @@ sonora/
 
 Reusable QML controls and layouts each have their own file in `ui/components/`;
 shared color tokens for dark, light, and accent themes live in `ui/qml/config/`.
+Motion uses shared Material 3 Expressive spatial and effects tokens, based on
+the [official spring-to-curve conversions](https://m3.material.io/styles/motion/overview/specs).
 
 ## License
 

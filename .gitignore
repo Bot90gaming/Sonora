@@ -6,3 +6,9 @@ __pycache__/
 *.pyo
 .env
 ~/.config/ytmusic_player/
+.agent/
+.agent
+/asset
+.vscode
+lyrics_live_test.png
+lyrics_sync_glow.png

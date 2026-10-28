@@ -1,39 +1,82 @@
 import QtQuick
 import QtQuick.Controls
 
+// Material 3 Expressive Thicker Slider with smooth state expansion
 Slider {
-    id: control
-    required property var themeColors
+    id: slider
+    property var themeColors: null
 
-    background: Rectangle {
-        x: control.leftPadding
-        y: control.topPadding + control.availableHeight / 2 - height / 2
-        width: control.availableWidth
-        height: 4
-        radius: 2
-        color: control.themeColors.border
+    implicitHeight: 36
+    hoverEnabled: true
+
+    background: Item {
+        x: slider.leftPadding
+        y: slider.topPadding + (slider.availableHeight - height) / 2
+        width: slider.availableWidth
+        height: slider.hovered || slider.pressed ? 12 : 8
+
+        Behavior on height {
+            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+        }
+        Behavior on y {
+            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+        }
+
+        // Inactive background track
         Rectangle {
-            width: control.visualPosition * parent.width
+            anchors.fill: parent
+            radius: height / 2
+            color: slider.themeColors ? slider.themeColors.surfaceContainerHighest : "#37393E"
+        }
+
+        // Active highlighted track
+        Rectangle {
+            width: Math.max(0, Math.min(parent.width, slider.visualPosition * parent.width))
             height: parent.height
-            radius: parent.radius
-            color: control.enabled ? control.themeColors.accent
-                : control.themeColors.disabledText
+            radius: height / 2
+            color: slider.themeColors ? slider.themeColors.primary : "#A8C7FA"
+
+            Behavior on width {
+                NumberAnimation {
+                    duration: 120
+                    easing.type: Easing.Linear
+                }
+            }
         }
     }
 
-    handle: Rectangle {
-        x: control.leftPadding
-            + control.visualPosition * (control.availableWidth - width)
-        y: control.topPadding + control.availableHeight / 2 - height / 2
-        implicitWidth: 14
-        implicitHeight: 14
-        radius: 7
-        color: control.enabled ? control.themeColors.accent
-            : control.themeColors.disabledText
-        border.color: control.themeColors.panel
-        border.width: 2
-        scale: control.pressed ? 1.12 : 1
-        Behavior on scale { NumberAnimation { duration: 110 } }
-        Behavior on color { ColorAnimation { duration: 160 } }
+    handle: Item {
+        x: slider.leftPadding + slider.visualPosition * slider.availableWidth - width / 2
+        y: slider.topPadding + slider.availableHeight / 2 - height / 2
+        width: slider.pressed ? 8 : 6
+        height: slider.hovered || slider.pressed ? 26 : 18
+
+        Behavior on x {
+            enabled: !slider.pressed
+            NumberAnimation {
+                duration: 120
+                easing.type: Easing.Linear
+            }
+        }
+
+        Behavior on height {
+            NumberAnimation { duration: 150; easing.type: Easing.OutBack }
+        }
+        Behavior on width {
+            NumberAnimation { duration: 150; easing.type: Easing.OutBack }
+        }
+
+        // M3 Pill Thumb
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: slider.themeColors ? slider.themeColors.primary : "#A8C7FA"
+            border.width: 1.5
+            border.color: "#FFFFFF"
+        }
+    }
+
+    HoverHandler {
+        cursorShape: Qt.PointingHandCursor
     }
 }
